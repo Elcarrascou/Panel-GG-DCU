@@ -14,7 +14,7 @@ App de **tracking de RRHH para PlexoTech**: quién trabaja en qué cliente/proye
 |------|--------|
 | Esquema Supabase + RLS + seed | ✅ Aplicado (5 migraciones) |
 | Auth (admin/viewer) + usuarios | ✅ Creados y probados |
-| Frontend Next.js 15 (todos los módulos) | ✅ Build verde, 23 rutas |
+| Frontend Next.js 15 (todos los módulos) | ✅ Build verde, 24 rutas |
 | Endpoint Fase 2 (`/api/ingest`) | ✅ Probado (upsert OK, 401/404 OK) |
 | Verificación en navegador (login→dashboard→personas) | ✅ OK con data real |
 | Git local (commit inicial) | ✅ 76 archivos |
@@ -213,7 +213,7 @@ README.md  HANDOFF.md
 
 ## 9. Verificación realizada
 
-- `npm run build` ✅ (23 rutas, sin errores; warning benigno de edge-runtime por supabase-js en middleware).
+- `npm run build` ✅ (24 rutas, sin errores; warning benigno de edge-runtime por supabase-js en middleware). La ruta nueva es `/personas/[id]/mover/[asignacionId]` (M3).
 - Servidor `npm start` + Claude_Preview: login con admin → Dashboard renderiza con data real (42 personas, donut por cliente correcto, 9 clientes). Lista de Personas: 42/42, badges, filtros OK.
 - Ingest probado por curl: secreto correcto → `ok:true`; secreto malo → 401; RUT inexistente → 404.
 - `get_advisors security` corrido; ítems corregibles arreglados en migración 05. Quedan (por diseño/config, no bloquean): `app_settings` sin policy (lock intencional), `ingest_registro_semanal` ejecutable por anon (secret-gated, intencional), y leaked-password protection desactivado (config de Auth, activar en dashboard).
@@ -229,10 +229,11 @@ README.md  HANDOFF.md
 - [ ] Cambiar passwords sembrados; activar leaked-password protection en Supabase Auth.
 - [ ] Cambiar `INGEST_SECRET` por uno propio (sync env ↔ `app_settings.ingest_secret`).
 
-**Mejoras futuras (no hechas, opcionales):**
-- [ ] Manejo de errores en formularios con `useActionState` (hoy un error de Server Action — ej. RUT duplicado — sale como error de Next, no inline).
-- [ ] Selects de proyecto/equipo dependientes del cliente (hoy muestran todos con el nombre del cliente en la etiqueta).
-- [ ] Acción "mover persona" como flujo único (hoy = cerrar asignación + crear nueva, dos pasos).
+**Mejoras implementadas (commit `52b2b83`, 2026-06-18 — verificadas en navegador y en producción):**
+- [x] **M1 — Errores inline en formularios.** Los 7 forms son client components con `useActionState`; las Server Actions retornan `{ error, fieldErrors }` para errores esperados (RUT/nombre duplicado vía código PG `23505`, campos vacíos, `fecha_fin < fecha_inicio`) en vez de lanzar. Error de campo bajo el input (`text-sm text-red-500`), general bajo el botón. Primitivas: `Field` acepta `error`, nuevo `FormError` en `components/ui/Form.tsx`.
+- [x] **M2 — Selects dependientes cliente → proyecto/equipo.** En `AsignacionForm`, `EquipoForm` y `MoverPersonaForm`: al elegir cliente se filtran proyectos activos (y equipos) de ese cliente con `useState`, reset al cambiar. Placeholders "Selecciona primero un cliente" / "Sin proyectos activos". *Implementado filtrando el array que ya entrega `getOpciones` (sin fetch al browser client): sin red, sin estados de carga, sin edge cases de auth.*
+- [x] **M3 — "Mover persona" en un paso.** Botón "Mover" junto a cada asignación activa en la ficha + ruta `/personas/[id]/mover/[asignacionId]` con `MoverPersonaForm`. Server Action `moverPersona`: cierra la asignación actual (`fecha_fin = inicio_nuevo − 1 día`) y crea la nueva; si falla el insert reabre la anterior (compensación, sin cambiar esquema). Banner de confirmación dinámico ("Se cerrará … con X y se creará una nueva con Y").
+- [x] **M4 — "Registrar semana" directo desde el dashboard.** Links "Registrar →" en la alerta "Pendientes de registro" del dashboard y banner en la ficha de persona → `/registros/nuevo?persona_id=[id]&semana=[lunes]`. La página precarga y **bloquea** persona y semana (intención explícita); `RegistroForm` admite `lockPersona`/`lockSemana`. La tabla `/registros` también usa `persona_id`.
 - [ ] Exportar reportes a PDF/Excel real (hoy = `window.print()`).
 - [ ] Generar tipos TS desde Supabase (`mcp__supabase__generate_typescript_types`) en vez de los tipos manuales en `types.ts`.
 - [ ] Confirmar con el negocio: ¿más tipos de trabajo / roles de equipo? ¿login propio del GG?
@@ -273,3 +274,8 @@ Alternativa CLI: `npx vercel` (interactivo, pide login y linkeo) → luego setea
 2. Endurecer Auth (passwords + leaked-password protection).
 3. Tomar mejoras de §10 según prioridad del usuario.
 4. Cuando se active Fase 2 real: conectar Notion → Claude → `POST /api/ingest`.
+
+---
+
+**Último cambio: 2026-06-18.**
+Commit `52b2b83` — M1/M2/M3/M4 implementadas y en producción.
