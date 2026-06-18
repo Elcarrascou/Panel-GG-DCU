@@ -8,7 +8,7 @@
 
 App de **tracking de RRHH para PlexoTech**: quién trabaja en qué cliente/proyecto, carga de trabajo semanal y reportería para el Gerente General. Dos roles: `admin` (escribe) y `viewer` (solo lectura).
 
-**Estado: build completo, verificado end-to-end localmente, pusheado a GitHub. Falta deploy en Vercel (manual, requiere token del usuario).**
+**Estado: build completo, verificado end-to-end, pusheado a GitHub y DESPLEGADO en Vercel.** Live: https://panel-gg-dcu.vercel.app
 
 | Área | Estado |
 |------|--------|
@@ -19,7 +19,7 @@ App de **tracking de RRHH para PlexoTech**: quién trabaja en qué cliente/proye
 | Verificación en navegador (login→dashboard→personas) | ✅ OK con data real |
 | Git local (commit inicial) | ✅ 76 archivos |
 | Push a GitHub | ✅ `Elcarrascou/Panel-GG-DCU` (privado) |
-| Deploy Vercel | ⛔ Pendiente — manual (ver §11) |
+| Deploy Vercel | ✅ `panel-gg-dcu.vercel.app` (CLI, prod, GitHub conectado) |
 
 ---
 
@@ -223,7 +223,7 @@ README.md  HANDOFF.md
 ## 10. Pendientes
 
 **Bloqueante para producción:**
-- [ ] **Deploy en Vercel** (ver §11). Requiere auth de Vercel del usuario — no automatizable desde aquí (sin token/CLI).
+- [x] **Deploy en Vercel** — HECHO 2026-06-18 vía CLI (`npx vercel --prod`, CLI ya logueado como `dacarrascu-1349`). Proyecto `dacarrascu-1349s-projects/panel-gg-dcu`, conectado al repo GitHub (push a `main` redespliega). Live: https://panel-gg-dcu.vercel.app. Env vars (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, INGEST_SECRET) seteadas solo en **Production** (agregar a Preview si se quieren previews de PR).
 
 **Recomendados:**
 - [ ] Cambiar passwords sembrados; activar leaked-password protection en Supabase Auth.
