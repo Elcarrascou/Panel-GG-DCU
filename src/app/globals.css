@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Plexotech — Design System (Brand Guidelines oficiales)
+   Spring Green sobre Onyx / blanco. Estética limpia, corporativa.
+   ============================================================ */
+
+:root {
+  /* Colores de marca */
+  --color-primary: #8ef67c; /* Spring Green */
+  --color-primary-dark: #6cd45a; /* hover */
+  --color-surface-dark: #2f2e2e; /* Onyx Black */
+  --color-jet: #000000;
+  --color-white: #ffffff;
+
+  /* Funcionales */
+  --color-background: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-border: #e5e7eb;
+  --color-text: #2f2e2e;
+  --color-text-muted: #6b7280;
+
+  /* Carga de trabajo */
+  --color-carga-sobrecargado: #ef4444;
+  --color-carga-mucho: #f97316;
+  --color-carga-normal: #8ef67c;
+  --color-carga-poco: #eab308;
+  --color-carga-ocioso: #9ca3af;
+}
+
+/* Tokens de tema -> generan utilidades Tailwind (bg-primary, text-onyx, ...) */
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-primary-dark: var(--color-primary-dark);
+  --color-onyx: var(--color-surface-dark);
+  --color-jet: var(--color-jet);
+
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-ink: var(--color-text);
+  --color-muted: var(--color-text-muted);
+
+  --color-carga-sobrecargado: var(--color-carga-sobrecargado);
+  --color-carga-mucho_trabajo: var(--color-carga-mucho);
+  --color-carga-normal: var(--color-carga-normal);
+  --color-carga-poco_trabajo: var(--color-carga-poco);
+  --color-carga-ocioso: var(--color-carga-ocioso);
+
+  --font-sans:
+    var(--font-inter), "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html,
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Scrollbar discreta */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+  border: 2px solid var(--color-background);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Foco accesible */
+:focus-visible {
+  outline: 2px solid var(--color-primary-dark);
+  outline-offset: 2px;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-full {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
