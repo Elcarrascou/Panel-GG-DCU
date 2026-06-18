@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPersonaDetalle, getOpciones } from "@/lib/data";
 import { isAdmin } from "@/lib/auth";
@@ -105,17 +106,25 @@ export default async function PersonaDetallePage({
                       <div className="flex shrink-0 flex-col items-end gap-2">
                         <RolBadge rol={a.rol_equipo} />
                         {admin && (
-                          <form action={cerrarAsignacion}>
-                            <input type="hidden" name="id" value={a.id} />
-                            <input
-                              type="hidden"
-                              name="redirect_to"
-                              value={`/personas/${id}`}
-                            />
-                            <button className="text-xs font-medium text-red-600 hover:underline">
-                              Cerrar
-                            </button>
-                          </form>
+                          <div className="flex items-center gap-3">
+                            <Link
+                              href={`/personas/${id}/mover/${a.id}`}
+                              className="text-xs font-medium text-[#2f6b27] hover:underline"
+                            >
+                              Mover
+                            </Link>
+                            <form action={cerrarAsignacion}>
+                              <input type="hidden" name="id" value={a.id} />
+                              <input
+                                type="hidden"
+                                name="redirect_to"
+                                value={`/personas/${id}`}
+                              />
+                              <button className="text-xs font-medium text-red-600 hover:underline">
+                                Cerrar
+                              </button>
+                            </form>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -134,13 +143,28 @@ export default async function PersonaDetallePage({
           />
           <CardBody>
             {admin ? (
-              <RegistroForm
-                personaId={id}
-                registro={registroSemana}
-                semana={semana}
-                redirectTo={`/personas/${id}`}
-                compact
-              />
+              <>
+                {!registroSemana && (
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p className="text-sm font-medium text-amber-900">
+                      Sin registro esta semana.
+                    </p>
+                    <Link
+                      href={`/registros/nuevo?persona_id=${id}&semana=${semana}`}
+                      className="text-xs font-semibold text-[#2f6b27] hover:underline"
+                    >
+                      Registrar esta semana →
+                    </Link>
+                  </div>
+                )}
+                <RegistroForm
+                  personaId={id}
+                  registro={registroSemana}
+                  semana={semana}
+                  redirectTo={`/personas/${id}`}
+                  compact
+                />
+              </>
             ) : registroSemana ? (
               <RegistroReadOnly registro={registroSemana} />
             ) : (

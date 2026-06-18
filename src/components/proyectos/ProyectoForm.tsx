@@ -1,10 +1,14 @@
-import { guardarProyecto } from "@/lib/actions";
+"use client";
+
+import { useActionState } from "react";
+import { guardarProyecto, type FormState } from "@/lib/actions";
 import {
   Field,
   FormGrid,
   TextInput,
   Select,
   Textarea,
+  FormError,
 } from "@/components/ui/Form";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import {
@@ -12,6 +16,9 @@ import {
   type Cliente,
   type Proyecto,
 } from "@/lib/types";
+
+const DATE_CLS =
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40";
 
 export function ProyectoForm({
   proyecto,
@@ -22,21 +29,21 @@ export function ProyectoForm({
   clientes: Cliente[];
   clienteIdDefault?: string;
 }) {
+  const [state, action] = useActionState<FormState, FormData>(guardarProyecto, {
+    error: null,
+  });
+  const fe = state.fieldErrors ?? {};
+
   return (
-    <form action={guardarProyecto} className="space-y-5">
+    <form action={action} className="space-y-5">
       {proyecto && <input type="hidden" name="id" value={proyecto.id} />}
       <FormGrid>
-        <Field label="Nombre" required>
-          <TextInput
-            name="nombre"
-            defaultValue={proyecto?.nombre ?? ""}
-            required
-          />
+        <Field label="Nombre" required error={fe.nombre}>
+          <TextInput name="nombre" defaultValue={proyecto?.nombre ?? ""} />
         </Field>
-        <Field label="Cliente / Área" required>
+        <Field label="Cliente / Área" required error={fe.cliente_id}>
           <Select
             name="cliente_id"
-            required
             defaultValue={proyecto?.cliente_id ?? clienteIdDefault ?? ""}
           >
             <option value="" disabled>
@@ -49,7 +56,7 @@ export function ProyectoForm({
             ))}
           </Select>
         </Field>
-        <Field label="Estado" required>
+        <Field label="Estado" required error={fe.estado}>
           <Select name="estado" defaultValue={proyecto?.estado ?? "activo"}>
             {(
               Object.keys(
@@ -67,15 +74,15 @@ export function ProyectoForm({
             type="date"
             name="fecha_inicio"
             defaultValue={proyecto?.fecha_inicio ?? ""}
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40"
+            className={DATE_CLS}
           />
         </Field>
-        <Field label="Fecha de fin">
+        <Field label="Fecha de fin" error={fe.fecha_fin}>
           <input
             type="date"
             name="fecha_fin"
             defaultValue={proyecto?.fecha_fin ?? ""}
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40"
+            className={DATE_CLS}
           />
         </Field>
       </FormGrid>
@@ -96,6 +103,7 @@ export function ProyectoForm({
           Cancelar
         </ButtonLink>
       </div>
+      <FormError message={state.error} />
     </form>
   );
 }

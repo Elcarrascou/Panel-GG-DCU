@@ -1,7 +1,10 @@
-import { guardarRegistro } from "@/lib/actions";
-import { Field, FormGrid, Select, Textarea } from "@/components/ui/Form";
+"use client";
+
+import { useActionState } from "react";
+import { guardarRegistro, type FormState } from "@/lib/actions";
+import { Field, FormGrid, Select, Textarea, FormError } from "@/components/ui/Form";
 import { Button } from "@/components/ui/Button";
-import { nombreCompleto, semanaActual } from "@/lib/format";
+import { nombreCompleto, rangoSemana, semanaActual } from "@/lib/format";
 import {
   CARGA_LABEL,
   CARGA_ORDEN,
@@ -10,6 +13,9 @@ import {
   type RegistroSemanal,
 } from "@/lib/types";
 
+const DATE_CLS =
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40";
+
 export function RegistroForm({
   personaId,
   personas,
@@ -17,6 +23,8 @@ export function RegistroForm({
   semana,
   redirectTo,
   compact = false,
+  lockPersona = false,
+  lockSemana = false,
 }: {
   personaId?: string;
   personas?: Persona[];
@@ -24,18 +32,28 @@ export function RegistroForm({
   semana?: string;
   redirectTo?: string;
   compact?: boolean;
+  lockPersona?: boolean;
+  lockSemana?: boolean;
 }) {
+  const [state, action] = useActionState<FormState, FormData>(guardarRegistro, {
+    error: null,
+  });
+  const fe = state.fieldErrors ?? {};
   const semanaDefault = registro?.semana ?? semana ?? semanaActual();
+  const personaBloqueada =
+    lockPersona && personaId
+      ? personas?.find((p) => p.id === personaId) ?? null
+      : null;
 
   return (
-    <form action={guardarRegistro} className="space-y-4">
+    <form action={action} className="space-y-4">
       {redirectTo && (
         <input type="hidden" name="redirect_to" value={redirectTo} />
       )}
 
-      {personas ? (
-        <Field label="Persona" required>
-          <Select name="persona_id" defaultValue={personaId ?? ""} required>
+      {personas && !lockPersona ? (
+        <Field label="Persona" required error={fe.persona_id}>
+          <Select name="persona_id" defaultValue={personaId ?? ""}>
             <option value="" disabled>
               Selecciona una persona…
             </option>
@@ -47,18 +65,35 @@ export function RegistroForm({
           </Select>
         </Field>
       ) : (
-        <input type="hidden" name="persona_id" value={personaId} />
+        <>
+          <input type="hidden" name="persona_id" value={personaId} />
+          {personaBloqueada && (
+            <Field label="Persona">
+              <div className="rounded-lg border border-border bg-gray-50 px-3 py-2 text-sm font-medium text-ink">
+                {nombreCompleto(personaBloqueada)}
+              </div>
+            </Field>
+          )}
+        </>
       )}
 
       <FormGrid>
-        <Field label="Semana (lunes)" required hint="Lunes de la semana">
-          <input
-            type="date"
-            name="semana"
-            defaultValue={semanaDefault}
-            required
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40"
-          />
+        <Field label="Semana (lunes)" required hint="Lunes de la semana" error={fe.semana}>
+          {lockSemana ? (
+            <>
+              <input type="hidden" name="semana" value={semanaDefault} />
+              <div className="rounded-lg border border-border bg-gray-50 px-3 py-2 text-sm text-ink">
+                {rangoSemana(semanaDefault)}
+              </div>
+            </>
+          ) : (
+            <input
+              type="date"
+              name="semana"
+              defaultValue={semanaDefault}
+              className={DATE_CLS}
+            />
+          )}
         </Field>
         <Field label="Carga de trabajo">
           <Select
@@ -113,6 +148,7 @@ export function RegistroForm({
       <Button type="submit">
         {registro ? "Actualizar registro" : "Guardar registro"}
       </Button>
+      <FormError message={state.error} />
     </form>
   );
 }

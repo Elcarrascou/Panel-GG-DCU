@@ -12,11 +12,13 @@ export function Field({
   label,
   hint,
   required,
+  error,
   children,
 }: {
   label: string;
   hint?: string;
   required?: boolean;
+  error?: string;
   children: ReactNode;
 }) {
   return (
@@ -26,9 +28,19 @@ export function Field({
         {required && <span className="text-red-500"> *</span>}
       </span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+      {error ? (
+        <span className="mt-1 block text-sm text-red-500">{error}</span>
+      ) : (
+        hint && <span className="mt-1 block text-xs text-muted">{hint}</span>
+      )}
     </label>
   );
+}
+
+// Error general del formulario (bajo el botón de submit).
+export function FormError({ message }: { message?: string | null }) {
+  if (!message) return null;
+  return <p className="text-sm text-red-500">{message}</p>;
 }
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {

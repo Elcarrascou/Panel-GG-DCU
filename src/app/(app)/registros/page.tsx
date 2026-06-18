@@ -121,7 +121,7 @@ export default async function RegistrosPage({
                 <TD className="text-right">
                   {admin && (
                     <Link
-                      href={`/registros/nuevo?persona=${e.persona.id}&semana=${semana}`}
+                      href={`/registros/nuevo?persona_id=${e.persona.id}&semana=${semana}`}
                       className="text-xs font-medium text-[#2f6b27] hover:underline"
                     >
                       {r ? "Editar" : "Registrar"}

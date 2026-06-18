@@ -119,7 +119,11 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader title="Pendientes de registro esta semana" />
             <CardBody className="p-0">
-              <AlertList items={d.personasSinRegistro} empty="Todo el equipo registrado." />
+              <AlertList
+                items={d.personasSinRegistro}
+                empty="Todo el equipo registrado."
+                registrarSemana={d.semana}
+              />
             </CardBody>
           </Card>
           <Card>
@@ -137,23 +141,42 @@ export default async function DashboardPage() {
 function AlertList({
   items,
   empty,
+  registrarSemana,
 }: {
   items: { id: string; nombre: string }[];
   empty: string;
+  registrarSemana?: string;
 }) {
   if (items.length === 0)
     return <p className="px-5 py-4 text-sm text-muted">{empty}</p>;
   return (
     <ul className="divide-y divide-border">
       {items.slice(0, 12).map((p) => (
-        <li key={p.id}>
+        <li
+          key={p.id}
+          className="flex items-center justify-between px-5 py-2.5 text-sm hover:bg-gray-50"
+        >
           <Link
             href={`/personas/${p.id}`}
-            className="flex items-center justify-between px-5 py-2.5 text-sm hover:bg-gray-50"
+            className="text-ink hover:underline"
           >
-            <span className="text-ink">{p.nombre}</span>
-            <span className="text-xs text-muted">Ver ficha →</span>
+            {p.nombre}
           </Link>
+          {registrarSemana ? (
+            <Link
+              href={`/registros/nuevo?persona_id=${p.id}&semana=${registrarSemana}`}
+              className="text-xs font-semibold text-[#2f6b27] hover:underline"
+            >
+              Registrar →
+            </Link>
+          ) : (
+            <Link
+              href={`/personas/${p.id}`}
+              className="text-xs text-muted hover:underline"
+            >
+              Ver ficha →
+            </Link>
+          )}
         </li>
       ))}
       {items.length > 12 && (

@@ -45,6 +45,13 @@ export function fechaCorta(iso: string | null): string {
   return `${d.getUTCDate()} ${MESES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+// Devuelve el día anterior (YYYY-MM-DD) a una fecha ISO dada.
+export function diaAnterior(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export function rangoSemana(lunesIso: string): string {
   const inicio = new Date(lunesIso + "T00:00:00");
   const fin = new Date(inicio);

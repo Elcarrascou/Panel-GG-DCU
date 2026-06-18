@@ -4,47 +4,77 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { assertAdmin } from "@/lib/auth";
+import { diaAnterior } from "@/lib/format";
+
+// ---------- estado de formularios (useActionState) ----------
+// Las Server Actions retornan este objeto para errores ESPERADOS (validación,
+// duplicados). Los errores inesperados (500) sí lanzan excepción.
+export type FormState = {
+  error: string | null;
+  fieldErrors?: Record<string, string>;
+};
 
 // ---------- helpers ----------
+type DbError = { code?: string; message: string } | null;
+
 function str(fd: FormData, key: string): string | null {
   const v = fd.get(key);
   if (typeof v !== "string") return null;
   const t = v.trim();
   return t === "" ? null : t;
 }
-function req(fd: FormData, key: string, label: string): string {
-  const v = str(fd, key);
-  if (!v) throw new Error(`El campo "${label}" es obligatorio.`);
-  return v;
+
+function invalid(
+  fieldErrors: Record<string, string>,
+  general = "Revisa los campos marcados.",
+): FormState {
+  return { error: general, fieldErrors };
 }
-function fail(error: { message: string } | null, ctx: string) {
-  if (error) throw new Error(`${ctx}: ${error.message}`);
-}
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 // ============================================================
 // PERSONAS
 // ============================================================
 
-export async function guardarPersona(fd: FormData) {
+export async function guardarPersona(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   await assertAdmin();
   const supabase = await createClient();
   const id = str(fd, "id");
+
+  const nombre = str(fd, "nombre");
+  const apellido = str(fd, "apellido");
+  const rut = str(fd, "rut");
+  const tipo_contrato = str(fd, "tipo_contrato");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!nombre) fieldErrors.nombre = "El nombre es obligatorio.";
+  if (!apellido) fieldErrors.apellido = "El apellido es obligatorio.";
+  if (!rut) fieldErrors.rut = "El RUT es obligatorio.";
+  if (!tipo_contrato)
+    fieldErrors.tipo_contrato = "Selecciona el tipo de contrato.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
   const payload = {
-    nombre: req(fd, "nombre", "Nombre"),
-    apellido: req(fd, "apellido", "Apellido"),
+    nombre,
+    apellido,
     segundo_apellido: str(fd, "segundo_apellido"),
-    rut: req(fd, "rut", "RUT"),
+    rut,
     cargo: str(fd, "cargo"),
-    tipo_contrato: req(fd, "tipo_contrato", "Tipo de contrato"),
+    tipo_contrato,
     activo: fd.get("activo") === "on" || fd.get("activo") === "true",
   };
 
+  let savedId = id;
   if (id) {
     const { error } = await supabase
       .from("personas")
       .update(payload)
       .eq("id", id);
-    fail(error, "No se pudo actualizar la persona");
+    if (error) return personaDbError(error);
     revalidatePath(`/personas/${id}`);
   } else {
     const { data, error } = await supabase
@@ -52,12 +82,20 @@ export async function guardarPersona(fd: FormData) {
       .insert({ ...payload, activo: true })
       .select("id")
       .single();
-    fail(error, "No se pudo crear la persona");
-    revalidatePath("/personas");
-    redirect(`/personas/${data!.id}`);
+    if (error) return personaDbError(error);
+    savedId = data!.id;
   }
   revalidatePath("/personas");
-  redirect(`/personas/${id}`);
+  redirect(`/personas/${savedId}`);
+}
+
+function personaDbError(error: DbError): FormState {
+  if (error?.code === "23505")
+    return {
+      error: "Ya existe una persona con ese RUT.",
+      fieldErrors: { rut: "RUT duplicado." },
+    };
+  return { error: `No se pudo guardar la persona: ${error?.message ?? ""}` };
 }
 
 export async function setPersonaActivo(id: string, activo: boolean) {
@@ -67,7 +105,7 @@ export async function setPersonaActivo(id: string, activo: boolean) {
     .from("personas")
     .update({ activo })
     .eq("id", id);
-  fail(error, "No se pudo cambiar el estado");
+  if (error) throw new Error(`No se pudo cambiar el estado: ${error.message}`);
   revalidatePath("/personas");
   revalidatePath(`/personas/${id}`);
 }
@@ -76,23 +114,32 @@ export async function setPersonaActivo(id: string, activo: boolean) {
 // CLIENTES
 // ============================================================
 
-export async function guardarCliente(fd: FormData) {
+export async function guardarCliente(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   await assertAdmin();
   const supabase = await createClient();
   const id = str(fd, "id");
-  const payload = {
-    nombre: req(fd, "nombre", "Nombre"),
-    tipo: req(fd, "tipo", "Tipo"),
-    estado: req(fd, "estado", "Estado"),
-    descripcion: str(fd, "descripcion"),
-  };
+
+  const nombre = str(fd, "nombre");
+  const tipo = str(fd, "tipo");
+  const estado = str(fd, "estado");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!nombre) fieldErrors.nombre = "El nombre es obligatorio.";
+  if (!tipo) fieldErrors.tipo = "Selecciona el tipo.";
+  if (!estado) fieldErrors.estado = "Selecciona el estado.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
+  const payload = { nombre, tipo, estado, descripcion: str(fd, "descripcion") };
 
   if (id) {
     const { error } = await supabase
       .from("clientes")
       .update(payload)
       .eq("id", id);
-    fail(error, "No se pudo actualizar el cliente");
+    if (error) return clienteDbError(error);
     revalidatePath(`/clientes/${id}`);
     revalidatePath("/clientes");
     redirect(`/clientes/${id}`);
@@ -102,27 +149,56 @@ export async function guardarCliente(fd: FormData) {
       .insert(payload)
       .select("id")
       .single();
-    fail(error, "No se pudo crear el cliente");
+    if (error) return clienteDbError(error);
     revalidatePath("/clientes");
     redirect(`/clientes/${data!.id}`);
   }
+}
+
+function clienteDbError(error: DbError): FormState {
+  if (error?.code === "23505")
+    return {
+      error: "Ya existe un cliente con ese nombre.",
+      fieldErrors: { nombre: "Nombre duplicado." },
+    };
+  return { error: `No se pudo guardar el cliente: ${error?.message ?? ""}` };
 }
 
 // ============================================================
 // PROYECTOS
 // ============================================================
 
-export async function guardarProyecto(fd: FormData) {
+export async function guardarProyecto(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   await assertAdmin();
   const supabase = await createClient();
   const id = str(fd, "id");
+
+  const nombre = str(fd, "nombre");
+  const cliente_id = str(fd, "cliente_id");
+  const estado = str(fd, "estado");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!nombre) fieldErrors.nombre = "El nombre es obligatorio.";
+  if (!cliente_id) fieldErrors.cliente_id = "Selecciona el cliente / área.";
+  if (!estado) fieldErrors.estado = "Selecciona el estado.";
+
+  const fecha_inicio = str(fd, "fecha_inicio");
+  const fecha_fin = str(fd, "fecha_fin");
+  if (fecha_inicio && fecha_fin && fecha_fin < fecha_inicio)
+    fieldErrors.fecha_fin =
+      "La fecha de fin no puede ser anterior a la de inicio.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
   const payload = {
-    nombre: req(fd, "nombre", "Nombre"),
-    cliente_id: req(fd, "cliente_id", "Cliente"),
-    estado: req(fd, "estado", "Estado"),
+    nombre,
+    cliente_id,
+    estado,
     descripcion: str(fd, "descripcion"),
-    fecha_inicio: str(fd, "fecha_inicio"),
-    fecha_fin: str(fd, "fecha_fin"),
+    fecha_inicio,
+    fecha_fin,
   };
 
   if (id) {
@@ -130,7 +206,7 @@ export async function guardarProyecto(fd: FormData) {
       .from("proyectos")
       .update(payload)
       .eq("id", id);
-    fail(error, "No se pudo actualizar el proyecto");
+    if (error) return { error: `No se pudo guardar el proyecto: ${error.message}` };
     revalidatePath(`/proyectos/${id}`);
     revalidatePath("/proyectos");
     redirect(`/proyectos/${id}`);
@@ -140,7 +216,7 @@ export async function guardarProyecto(fd: FormData) {
       .insert(payload)
       .select("id")
       .single();
-    fail(error, "No se pudo crear el proyecto");
+    if (error) return { error: `No se pudo crear el proyecto: ${error.message}` };
     revalidatePath("/proyectos");
     redirect(`/proyectos/${data!.id}`);
   }
@@ -150,21 +226,29 @@ export async function guardarProyecto(fd: FormData) {
 // EQUIPOS
 // ============================================================
 
-export async function guardarEquipo(fd: FormData) {
+export async function guardarEquipo(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   await assertAdmin();
   const supabase = await createClient();
   const id = str(fd, "id");
-  const payload = {
-    nombre: req(fd, "nombre", "Nombre"),
-    cliente_id: req(fd, "cliente_id", "Cliente"),
-    proyecto_id: str(fd, "proyecto_id"),
-  };
+
+  const nombre = str(fd, "nombre");
+  const cliente_id = str(fd, "cliente_id");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!nombre) fieldErrors.nombre = "El nombre es obligatorio.";
+  if (!cliente_id) fieldErrors.cliente_id = "Selecciona el cliente / área.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
+  const payload = { nombre, cliente_id, proyecto_id: str(fd, "proyecto_id") };
   if (id) {
     const { error } = await supabase
       .from("equipos")
       .update(payload)
       .eq("id", id);
-    fail(error, "No se pudo actualizar el equipo");
+    if (error) return { error: `No se pudo guardar el equipo: ${error.message}` };
     revalidatePath(`/equipos/${id}`);
     revalidatePath("/equipos");
     redirect(`/equipos/${id}`);
@@ -174,7 +258,7 @@ export async function guardarEquipo(fd: FormData) {
       .insert(payload)
       .select("id")
       .single();
-    fail(error, "No se pudo crear el equipo");
+    if (error) return { error: `No se pudo crear el equipo: ${error.message}` };
     revalidatePath("/equipos");
     redirect(`/equipos/${data!.id}`);
   }
@@ -184,36 +268,49 @@ export async function guardarEquipo(fd: FormData) {
 // ASIGNACIONES (soft delete vía fecha_fin)
 // ============================================================
 
-export async function crearAsignacion(fd: FormData) {
+export async function crearAsignacion(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   await assertAdmin();
   const supabase = await createClient();
-  const persona_id = req(fd, "persona_id", "Persona");
+
+  const persona_id = str(fd, "persona_id");
+  const cliente_id = str(fd, "cliente_id");
+  const equipo_id = str(fd, "equipo_id");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!persona_id) fieldErrors.persona_id = "Selecciona una persona.";
+  if (!cliente_id && !equipo_id)
+    fieldErrors.cliente_id = "Selecciona el cliente / área.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
   const payload = {
     persona_id,
-    cliente_id: str(fd, "cliente_id"),
+    cliente_id,
     proyecto_id: str(fd, "proyecto_id"),
-    equipo_id: str(fd, "equipo_id"),
+    equipo_id,
     rol_equipo: str(fd, "rol_equipo") ?? "colaborador",
-    fecha_inicio: str(fd, "fecha_inicio") ?? new Date().toISOString().slice(0, 10),
+    fecha_inicio: str(fd, "fecha_inicio") ?? today(),
   };
   const { error } = await supabase.from("asignaciones").insert(payload);
-  fail(error, "No se pudo crear la asignación");
+  if (error) return { error: `No se pudo crear la asignación: ${error.message}` };
   revalidatePath(`/personas/${persona_id}`);
   const redirectTo = str(fd, "redirect_to");
-  if (redirectTo) redirect(redirectTo);
-  redirect(`/personas/${persona_id}`);
+  redirect(redirectTo ?? `/personas/${persona_id}`);
 }
 
 export async function cerrarAsignacion(fd: FormData) {
   await assertAdmin();
   const supabase = await createClient();
-  const id = req(fd, "id", "Asignación");
-  const fecha = str(fd, "fecha_fin") ?? new Date().toISOString().slice(0, 10);
+  const id = str(fd, "id");
+  if (!id) throw new Error('El campo "Asignación" es obligatorio.');
+  const fecha = str(fd, "fecha_fin") ?? today();
   const { error } = await supabase
     .from("asignaciones")
     .update({ fecha_fin: fecha })
     .eq("id", id);
-  fail(error, "No se pudo cerrar la asignación");
+  if (error) throw new Error(`No se pudo cerrar la asignación: ${error.message}`);
   const redirectTo = str(fd, "redirect_to");
   if (redirectTo) {
     revalidatePath(redirectTo);
@@ -221,15 +318,88 @@ export async function cerrarAsignacion(fd: FormData) {
   }
 }
 
+// Mueve a una persona de una asignación a otra en un solo paso:
+// cierra la actual (fecha_fin = inicio_nueva - 1 día) y crea la nueva.
+export async function moverPersona(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  await assertAdmin();
+  const supabase = await createClient();
+
+  const asignacionId = str(fd, "asignacion_id");
+  const persona_id = str(fd, "persona_id");
+  if (!asignacionId || !persona_id)
+    return { error: "Datos de la asignación incompletos." };
+
+  const cliente_id = str(fd, "cliente_id");
+  const fecha_inicio = str(fd, "fecha_inicio");
+  const fechaInicioActual = str(fd, "fecha_inicio_actual");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!cliente_id) fieldErrors.cliente_id = "Selecciona el cliente / área destino.";
+  if (!fecha_inicio) fieldErrors.fecha_inicio = "Indica la fecha de inicio.";
+  if (
+    fecha_inicio &&
+    fechaInicioActual &&
+    fecha_inicio <= fechaInicioActual
+  )
+    fieldErrors.fecha_inicio =
+      "Debe ser posterior al inicio de la asignación actual.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
+  const fechaFin = diaAnterior(fecha_inicio!);
+
+  // 1) cerrar la asignación actual
+  const { error: closeErr } = await supabase
+    .from("asignaciones")
+    .update({ fecha_fin: fechaFin })
+    .eq("id", asignacionId);
+  if (closeErr)
+    return {
+      error: `No se pudo cerrar la asignación actual: ${closeErr.message}`,
+    };
+
+  // 2) crear la nueva; si falla, reabrir la anterior (compensación)
+  const { error: insErr } = await supabase.from("asignaciones").insert({
+    persona_id,
+    cliente_id,
+    proyecto_id: str(fd, "proyecto_id"),
+    equipo_id: null,
+    rol_equipo: str(fd, "rol_equipo") ?? "colaborador",
+    fecha_inicio,
+  });
+  if (insErr) {
+    await supabase
+      .from("asignaciones")
+      .update({ fecha_fin: null })
+      .eq("id", asignacionId);
+    return { error: `No se pudo crear la nueva asignación: ${insErr.message}` };
+  }
+
+  revalidatePath(`/personas/${persona_id}`);
+  redirect(`/personas/${persona_id}`);
+}
+
 // ============================================================
 // REGISTROS SEMANALES (upsert por persona + semana)
 // ============================================================
 
-export async function guardarRegistro(fd: FormData) {
+export async function guardarRegistro(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
   await assertAdmin();
   const supabase = await createClient();
-  const persona_id = req(fd, "persona_id", "Persona");
-  const semana = req(fd, "semana", "Semana");
+
+  const persona_id = str(fd, "persona_id");
+  const semana = str(fd, "semana");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!persona_id) fieldErrors.persona_id = "Selecciona una persona.";
+  if (!semana) fieldErrors.semana = "Indica la semana (lunes).";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
   const payload = {
     persona_id,
     semana,
@@ -241,7 +411,7 @@ export async function guardarRegistro(fd: FormData) {
   const { error } = await supabase
     .from("registros_semanales")
     .upsert(payload, { onConflict: "persona_id,semana" });
-  fail(error, "No se pudo guardar el registro");
+  if (error) return { error: `No se pudo guardar el registro: ${error.message}` };
   revalidatePath(`/personas/${persona_id}`);
   revalidatePath("/registros");
   revalidatePath("/");
