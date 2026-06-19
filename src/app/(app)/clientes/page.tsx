@@ -19,7 +19,14 @@ export default async function ClientesPage() {
         title="Clientes y áreas"
         subtitle="Clientes externos y áreas internas"
         action={
-          admin && <ButtonLink href="/clientes/nuevo">+ Nuevo cliente</ButtonLink>
+          <div className="flex items-center gap-2">
+            <ButtonLink href="/clientes/presentacion" variant="ghost">
+              ▶ Presentar
+            </ButtonLink>
+            {admin && (
+              <ButtonLink href="/clientes/nuevo">+ Nuevo cliente</ButtonLink>
+            )}
+          </div>
         }
       />
       <Table>
@@ -35,12 +42,23 @@ export default async function ClientesPage() {
           {clientes.map((c) => (
             <TR key={c.id}>
               <TD>
-                <Link
-                  href={`/clientes/${c.id}`}
-                  className="font-medium text-ink hover:underline"
-                >
-                  {c.nombre}
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/clientes/${c.id}`}
+                    className="font-medium text-ink hover:underline"
+                  >
+                    {c.nombre}
+                  </Link>
+                  {c.proximos_pasos?.trim() && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/25 px-2 py-0.5 text-[11px] font-medium text-green-ink"
+                      title="Tiene próximos pasos definidos"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary-dark" />
+                      Acción pendiente
+                    </span>
+                  )}
+                </div>
               </TD>
               <TD>
                 <Badge tone={c.tipo === "interno" ? "dark" : "outline"}>

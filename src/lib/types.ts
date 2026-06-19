@@ -47,6 +47,13 @@ export interface Cliente {
   tipo: ClienteTipo;
   estado: ClienteEstado;
   descripcion: string | null;
+  // Contexto estratégico (texto libre, lo alimenta el Admin/PMO)
+  contexto_actual: string | null;
+  ultimos_eventos: string | null;
+  proximos_pasos: string | null;
+  proyectos_futuros: string | null;
+  contactos_cliente: string | null;
+  notas_estrategicas: string | null;
   created_at: string;
   updated_at: string;
 }

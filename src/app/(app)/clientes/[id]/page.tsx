@@ -15,6 +15,7 @@ import {
   RolBadge,
 } from "@/components/ui/Badges";
 import { CargaBar } from "@/components/charts/CargaBar";
+import { ContextoEstrategico } from "@/components/clientes/ContextoEstrategico";
 import { CLIENTE_TIPO_LABEL, type CargaTrabajo } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -187,6 +188,8 @@ export default async function ClienteDetallePage({
           </CardBody>
         </Card>
       )}
+
+      <ContextoEstrategico cliente={cliente} />
     </div>
   );
 }

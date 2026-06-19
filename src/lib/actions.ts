@@ -132,7 +132,18 @@ export async function guardarCliente(
   if (!estado) fieldErrors.estado = "Selecciona el estado.";
   if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
 
-  const payload = { nombre, tipo, estado, descripcion: str(fd, "descripcion") };
+  const payload = {
+    nombre,
+    tipo,
+    estado,
+    descripcion: str(fd, "descripcion"),
+    contexto_actual: str(fd, "contexto_actual"),
+    ultimos_eventos: str(fd, "ultimos_eventos"),
+    proximos_pasos: str(fd, "proximos_pasos"),
+    proyectos_futuros: str(fd, "proyectos_futuros"),
+    contactos_cliente: str(fd, "contactos_cliente"),
+    notas_estrategicas: str(fd, "notas_estrategicas"),
+  };
 
   if (id) {
     const { error } = await supabase

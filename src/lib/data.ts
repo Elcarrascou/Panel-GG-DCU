@@ -178,6 +178,57 @@ export async function getClienteDetalle(id: string) {
   };
 }
 
+// Clientes activos con su equipo asignado, para el modo presentación ejecutiva.
+export interface ClientePresentacion {
+  cliente: Cliente;
+  personas: {
+    persona: Persona;
+    carga: CargaTrabajo | null;
+    rol: Asignacion["rol_equipo"];
+  }[];
+}
+
+export async function getClientesPresentacion(): Promise<ClientePresentacion[]> {
+  const supabase = await createClient();
+  const [clientesR, asigsR, personasR, regsR] = await Promise.all([
+    supabase
+      .from("clientes")
+      .select("*")
+      .eq("estado", "activo")
+      .order("nombre"),
+    supabase.from("asignaciones").select("*").is("fecha_fin", null),
+    supabase.from("personas").select("*"),
+    supabase
+      .from("registros_semanales")
+      .select("*")
+      .order("semana", { ascending: false }),
+  ]);
+
+  const clientes = (clientesR.data ?? []) as Cliente[];
+  const personas = byId<Persona>(personasR.data as Persona[]);
+  const asigs = (asigsR.data ?? []) as Asignacion[];
+  const regs = (regsR.data ?? []) as RegistroSemanal[];
+  const semana = semanaActual();
+
+  return clientes.map((cliente) => ({
+    cliente,
+    personas: asigs
+      .filter((a) => a.cliente_id === cliente.id)
+      .map((a) => {
+        const persona = personas.get(a.persona_id) ?? null;
+        const reg =
+          regs.find(
+            (r) => r.persona_id === a.persona_id && r.semana === semana,
+          ) ?? regs.find((r) => r.persona_id === a.persona_id);
+        return { persona, carga: reg?.carga_trabajo ?? null, rol: a.rol_equipo };
+      })
+      .filter(
+        (m): m is { persona: Persona; carga: CargaTrabajo | null; rol: Asignacion["rol_equipo"] } =>
+          m.persona !== null,
+      ),
+  }));
+}
+
 // ============================================================
 // PROYECTOS
 // ============================================================
