@@ -429,3 +429,61 @@ export async function guardarRegistro(
   const redirectTo = str(fd, "redirect_to");
   redirect(redirectTo ?? `/personas/${persona_id}`);
 }
+
+// ============================================================
+// ALERTAS DE GESTIÓN
+// ============================================================
+
+// Cambia el estado de una alerta (pendiente / en_gestion / resuelta).
+// Se invoca desde botones-formulario, por eso lee FormData.
+export async function cambiarEstadoAlerta(fd: FormData) {
+  await assertAdmin();
+  const supabase = await createClient();
+  const id = str(fd, "id");
+  const estado = str(fd, "estado");
+  if (!id || !estado) throw new Error("Datos de la alerta incompletos.");
+  if (!["pendiente", "en_gestion", "resuelta"].includes(estado))
+    throw new Error("Estado de alerta inválido.");
+
+  const { error } = await supabase
+    .from("alertas_gestion")
+    .update({ estado })
+    .eq("id", id);
+  if (error)
+    throw new Error(`No se pudo actualizar la alerta: ${error.message}`);
+  revalidatePath("/");
+  revalidatePath("/alertas");
+}
+
+export async function crearAlerta(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  await assertAdmin();
+  const supabase = await createClient();
+
+  const titulo = str(fd, "titulo");
+  const tipo = str(fd, "tipo");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!titulo) fieldErrors.titulo = "El título es obligatorio.";
+  if (!tipo) fieldErrors.tipo = "Selecciona el tipo.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
+  const payload = {
+    titulo,
+    descripcion: str(fd, "descripcion"),
+    tipo,
+    estado: "pendiente",
+    categoria: str(fd, "categoria"),
+    cliente_id: str(fd, "cliente_id"),
+    proyecto_id: str(fd, "proyecto_id"),
+    persona_id: str(fd, "persona_id"),
+    fecha_limite: str(fd, "fecha_limite"),
+  };
+  const { error } = await supabase.from("alertas_gestion").insert(payload);
+  if (error) return { error: `No se pudo crear la alerta: ${error.message}` };
+  revalidatePath("/");
+  revalidatePath("/alertas");
+  redirect("/alertas");
+}

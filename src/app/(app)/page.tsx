@@ -1,25 +1,37 @@
 import Link from "next/link";
-import { getDashboardData } from "@/lib/data";
+import {
+  getDashboardData,
+  getAlertasActivas,
+  getProyectosCriticos,
+  type ProyectoCritico,
+} from "@/lib/data";
+import { isAdmin } from "@/lib/auth";
 import { rangoSemana } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { CargaBar } from "@/components/charts/CargaBar";
 import { Donut, DONUT_PALETTE } from "@/components/charts/Donut";
+import { AlertaCard } from "@/components/alertas/AlertaCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const d = await getDashboardData();
+  const [d, alertas, proyectos, admin] = await Promise.all([
+    getDashboardData(),
+    getAlertasActivas(),
+    getProyectosCriticos(),
+    isAdmin(),
+  ]);
+
   const slices = d.porCliente.map((c, i) => ({
     label: c.nombre,
     value: c.value,
     color: DONUT_PALETTE[i % DONUT_PALETTE.length],
   }));
-  const coberturaPct =
-    d.totalActivas > 0
-      ? Math.round((d.conRegistro / d.totalActivas) * 100)
-      : 0;
+
+  const criticas = alertas.filter((a) => a.tipo === "critica").length;
 
   return (
     <div>
@@ -28,45 +40,47 @@ export default async function DashboardPage() {
         subtitle={`Semana en curso · ${rangoSemana(d.semana)}`}
       />
 
-      {/* Alertas */}
-      {(d.sinRegistro > 0 || d.sinAsignacion.length > 0) && (
-        <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          {d.sinRegistro > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-sm font-semibold text-amber-900">
-                {d.sinRegistro} persona{d.sinRegistro !== 1 && "s"} sin registro
-                esta semana
-              </p>
-              <p className="mt-0.5 text-xs text-amber-800">
-                Cobertura de registros: {coberturaPct}% del equipo activo.{" "}
-                <Link href="/registros" className="font-medium underline">
-                  Ir a registros
-                </Link>
-              </p>
-            </div>
-          )}
-          {d.sinAsignacion.length > 0 && (
-            <div className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-3">
-              <p className="text-sm font-semibold text-ink">
-                {d.sinAsignacion.length} persona
-                {d.sinAsignacion.length !== 1 && "s"} sin asignación activa
-              </p>
-              <p className="mt-0.5 text-xs text-muted">
-                Capacidad potencialmente disponible.{" "}
-                <Link
-                  href="/reportes#sin-asignacion"
-                  className="font-medium underline"
-                >
-                  Ver detalle
-                </Link>
-              </p>
-            </div>
-          )}
+      {/* ============ ZONA 1 — Decisiones y alertas críticas ============ */}
+      <section className="mb-8">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-ink">
+              Atención requerida
+            </h2>
+            <p className="text-sm text-muted">
+              {alertas.length > 0
+                ? `${alertas.length} decisión(es) pendiente(s)${
+                    criticas > 0 ? ` · ${criticas} crítica(s)` : ""
+                  }`
+                : "Estado de las decisiones de gestión"}
+            </p>
+          </div>
+          <Link
+            href="/alertas"
+            className="text-sm font-semibold text-green-ink hover:underline"
+          >
+            Gestionar todas →
+          </Link>
         </div>
-      )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {alertas.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 px-5 py-4">
+            <span className="text-xl">✓</span>
+            <p className="text-sm font-medium text-green-ink">
+              Sin decisiones pendientes esta semana.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {alertas.map((a) => (
+              <AlertaCard key={a.id} alerta={a} admin={admin} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ============ ZONA 2 — KPIs operacionales ============ */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         <StatCard
           label="Personas activas"
           value={d.totalActivas}
@@ -78,9 +92,12 @@ export default async function DashboardPage() {
           value={d.clientesActivos}
           hint={`${d.clientesInactivos} inactivo(s)`}
         />
+        <StatCard label="Proyectos activos" value={d.proyectosActivos} />
         <StatCard
-          label="Proyectos activos"
-          value={d.proyectosActivos}
+          label="Sin asignación"
+          value={d.sinAsignacion.length}
+          tone={d.sinAsignacion.length > 0 ? "alert" : "ok"}
+          hint="Capacidad disponible"
         />
         <StatCard
           label="Sin registro semanal"
@@ -113,13 +130,48 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Listas de alerta */}
+      {/* ============ ZONA 3 — Estado de proyectos ============ */}
+      {proyectos.length > 0 && (
+        <div className="mt-6">
+          <Card>
+            <CardHeader
+              title="Estado de proyectos"
+              subtitle="Criticidad según alertas activas asociadas"
+            />
+            <CardBody className="p-0">
+              <ul className="divide-y divide-border">
+                {proyectos.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between gap-3 px-5 py-3"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        href={`/proyectos/${p.id}`}
+                        className="block truncate text-sm font-medium text-ink hover:underline"
+                      >
+                        {p.nombre}
+                      </Link>
+                      {p.cliente && (
+                        <span className="text-xs text-muted">{p.cliente}</span>
+                      )}
+                    </div>
+                    <CriticidadBadge criticidad={p.criticidad} />
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+        </div>
+      )}
+
+      {/* Listas de pendientes operacionales */}
       {(d.personasSinRegistro.length > 0 || d.sinAsignacion.length > 0) && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader title="Pendientes de registro esta semana" />
             <CardBody className="p-0">
-              <AlertList
+              <ListaPendientes
                 items={d.personasSinRegistro}
                 empty="Todo el equipo registrado."
                 registrarSemana={d.semana}
@@ -129,7 +181,10 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader title="Sin asignación activa" />
             <CardBody className="p-0">
-              <AlertList items={d.sinAsignacion} empty="Todos asignados." />
+              <ListaPendientes
+                items={d.sinAsignacion}
+                empty="Todos asignados."
+              />
             </CardBody>
           </Card>
         </div>
@@ -138,7 +193,22 @@ export default async function DashboardPage() {
   );
 }
 
-function AlertList({
+function CriticidadBadge({
+  criticidad,
+}: {
+  criticidad: ProyectoCritico["criticidad"];
+}) {
+  const map = {
+    critica: { tone: "red" as const, label: "Crítico" },
+    importante: { tone: "amber" as const, label: "Atención" },
+    seguimiento: { tone: "neutral" as const, label: "Seguimiento" },
+    normal: { tone: "green" as const, label: "En curso" },
+  };
+  const { tone, label } = map[criticidad];
+  return <Badge tone={tone}>{label}</Badge>;
+}
+
+function ListaPendientes({
   items,
   empty,
   registrarSemana,
@@ -156,10 +226,7 @@ function AlertList({
           key={p.id}
           className="flex items-center justify-between px-5 py-2.5 text-sm hover:bg-gray-50"
         >
-          <Link
-            href={`/personas/${p.id}`}
-            className="text-ink hover:underline"
-          >
+          <Link href={`/personas/${p.id}`} className="text-ink hover:underline">
             {p.nombre}
           </Link>
           {registrarSemana ? (

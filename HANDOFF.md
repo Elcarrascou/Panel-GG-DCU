@@ -103,6 +103,7 @@ Helper de rol: `public.is_admin()` (SECURITY DEFINER) — usado en RLS y en el c
 - **`registros_semanales`**: id, persona_id(FK), semana(date, lunes ISO), resumen?, tipo_trabajo?, carga_trabajo?, hitos?, timestamps. **Unique (persona_id, semana).**
 - **`profiles`**: id(FK→auth.users), email, nombre, role(app_role), created_at.
 - **`app_settings`**: key(PK), value. Guarda `ingest_secret`. **RLS habilitado SIN policies** → inaccesible por API; solo funciones SECURITY DEFINER lo leen (intencional).
+- **`alertas_gestion`** (M6): id, titulo, descripcion?, `tipo`(critica|importante|seguimiento, CHECK), `estado`(pendiente|en_gestion|resuelta, CHECK, default pendiente), `categoria`?(personas|proyectos|clientes|contratos|operacional, CHECK), cliente_id?/proyecto_id?/persona_id? (FK con `ON DELETE SET NULL`), fecha_limite?, timestamps. RLS: SELECT a `authenticated`, escritura solo `is_admin()`. Trigger updated_at. **No son enums Postgres sino `text` con CHECK** (a diferencia del resto del modelo).
 
 ### RLS (resumen)
 - Tablas de datos (personas, clientes, proyectos, equipos, asignaciones, registros_semanales): `SELECT` a cualquier `authenticated` (`using true`); `INSERT/UPDATE/DELETE` solo si `public.is_admin()`.
@@ -121,6 +122,7 @@ Helper de rol: `public.is_admin()` (SECURITY DEFINER) — usado en RLS y en el c
 4. `04_ingest_fase2` (tabla app_settings + RPC `ingest_registro_semanal`)
 5. `05_security_hardening` (search_path en set_updated_at; revoke EXECUTE en funciones definer)
 6. `06_clientes_contexto_estrategico` (6 columnas text de contexto estratégico en `clientes`) — M5
+7. `07_alertas_gestion` (tabla `alertas_gestion` + RLS + trigger updated_at + índices) — M6
 
 > Para ver migraciones: `mcp__supabase__list_migrations`. Para nuevas DDL: `apply_migration`. Para queries: `execute_sql`.
 
@@ -246,6 +248,15 @@ README.md  HANDOFF.md
   - **`/clientes/presentacion`** (`PresentacionView.tsx`, client): ruta **fuera del grupo `(app)`** → no hereda sidebar/topbar (fullscreen). Protegida por middleware + `getCurrentUser` (admin y viewer). Fondo onyx, acento Spring Green, slideshow (botones Anterior/Siguiente, puntos, flechas de teclado ←/→ y PageUp/Down), barra con Imprimir (`window.print`) y "Salir de presentación". Una `<article>` por cliente activo; en pantalla se muestra la activa, **en impresión se muestran todas** (`print:block` + `print:break-after-page`) con colores claros. Muestra contexto/eventos/pasos/proyectos + equipo; **oculta `contactos_cliente` y `notas_estrategicas`** (internos). Slides sin contenido estratégico muestran solo encabezado + equipo.
   - **Gotcha de routing:** colocar `presentacion` en `src/app/clientes/` (no en `src/app/(app)/clientes/`) es lo que la libra del layout con sidebar; el build no genera conflicto porque `presentacion` es un segmento estático único (no choca con `[id]`).
   - **Dato de prueba:** durante la verificación se rellenaron los 6 campos de **Consorcio** (`67715f2e-1a67-4fad-a015-af3ed7540f1d`) con texto de ejemplo realista — sigue en la DB de producción. Limpiar/editar desde la ficha si se quiere data en blanco.
+- [x] **M6 — Alertas de decisiones críticas en dashboard + página `/alertas`** (2026-06-19 — verificado en navegador con data real, push pendiente al cierre de esta sesión). Daniel (Admin/PMO) alimenta las alertas tras sus reuniones; el GG las ve al entrar.
+  - **DB:** migración `07` crea `alertas_gestion` (ver §5) + 13 alertas seed reales (7 críticas, 4 importantes, 2 seguimiento). Tipos `AlertaTipo/Estado/Categoria` + `AlertaGestion` (con joins embebidos `clientes/proyectos/personas`) y label maps en `types.ts`.
+  - **`data.ts`:** `getAlertasActivas()` (pendiente+en_gestion, ordenadas crítica→fecha→antigüedad **en memoria** porque `tipo` es texto), `getTodasLasAlertas()`, `getProyectosCriticos()` (proyectos activos + criticidad derivada de alertas activas asociadas al proyecto o su cliente). Select embebido: `*, clientes(nombre), proyectos(nombre), personas(nombre, apellido)`.
+  - **`actions.ts`:** `cambiarEstadoAlerta(fd)` (FormData, admin, valida estado) y `crearAlerta(prev, fd)` (M1 `useActionState`).
+  - **Dashboard (`(app)/page.tsx`) — 3 zonas:** Zona 1 "Atención requerida" (alertas activas como cards, críticas primero, **lo primero que ve el GG**); Zona 2 KPIs (se agregó "Sin asignación"); Zona 3 "Estado de proyectos" (badge de criticidad data-driven). El helper local pasó a llamarse `ListaPendientes`.
+  - **`/alertas`** (`(app)/alertas/page.tsx`, server): filtros por estado/tipo/categoría vía **searchParams (GET form, sin JS)**; admins ven `CrearAlertaForm` (client, colapsable) y los botones de acción. Resueltas no se borran — quedan con estado `resuelta` y se ven con filtro Estado=Resueltas.
+  - **Componentes:** `components/alertas/AlertaCard.tsx` (server, reusable en dashboard y /alertas; botones-form llaman `cambiarEstadoAlerta`) y `CrearAlertaForm.tsx` (client).
+  - **Nav:** ítem "Alertas" agregado a `nav.tsx` (lo consumen Sidebar y MobileNav).
+- [x] **Carga de datos de negocio v1.0** (2026-06-19, vía Supabase MCP `execute_sql`). Se eliminó la data ficticia (42 asignaciones placeholder del seed + 1 registro de prueba; clientes/proyectos/equipos quedaron intactos o vacíos) y se cargaron datos reales: contexto estratégico de 7 clientes, +Colmena y +Plexotech Interno, 6 proyectos, 9 equipos, 36 asignaciones activas, 4 registros semanales (semana lunes `2026-06-15`). Correcciones: Carlos Mellior→Mellor, Roberto Celedón inactivo, +Valeria Selman. **Ahora la DB de producción tiene data real, no seed.** Quedan 14 personas activas sin asignación (incluye PMO, GG, áreas internas, Joel Astete y Genaro Coñolef como casos a resolver). Colmena no tiene equipo asignado aún (el script de carga no incluyó asignaciones para Colmena).
 - [ ] Exportar reportes a PDF/Excel real (hoy = `window.print()`).
 - [ ] Generar tipos TS desde Supabase (`mcp__supabase__generate_typescript_types`) en vez de los tipos manuales en `types.ts`.
 - [ ] Confirmar con el negocio: ¿más tipos de trabajo / roles de equipo? ¿login propio del GG?
@@ -289,5 +300,18 @@ Alternativa CLI: `npx vercel` (interactivo, pide login y linkeo) → luego setea
 
 ---
 
+## 14. Flujo de trabajo semanal (operación)
+
+El sistema se alimenta semanalmente, igual que los registros:
+
+1. Daniel Carrasco (Admin/PMO) se reúne con los colaboradores / jefes de equipo.
+2. Actualiza los **registros semanales** en el sistema (carga, resumen, hitos por persona).
+3. Crea o actualiza **alertas de gestión** según lo conversado (decisiones pendientes, bloqueantes, reuniones). Resuelve las que ya se cerraron (no se borran: pasan a estado `resuelta`).
+4. El **Gerente General** entra al dashboard y ve, en orden: las decisiones que requieren acción (Zona 1), los KPIs operacionales (Zona 2) y el estado de los proyectos (Zona 3).
+
+El GG solo lee; el Admin crea/edita/resuelve. La seguridad real la da RLS (`is_admin()`).
+
+---
+
 **Último cambio: 2026-06-19.**
-Commit `cc9ef41` — M5 (contexto estratégico de clientes + modo presentación ejecutiva). Previas: `52b2b83` M1/M2/M3/M4.
+M6 (alertas de decisiones críticas + `/alertas`) y carga de datos de negocio v1.0 a producción. Previas: `cc9ef41` M5, `52b2b83` M1/M2/M3/M4.

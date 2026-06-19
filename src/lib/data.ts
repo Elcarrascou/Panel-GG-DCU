@@ -1,12 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { semanaActual } from "@/lib/format";
 import type {
+  AlertaGestion,
+  AlertaTipo,
   Asignacion,
   CargaTrabajo,
   Cliente,
   Equipo,
   Persona,
   Proyecto,
+  ProyectoEstado,
   RegistroSemanal,
 } from "@/lib/types";
 
@@ -501,6 +504,112 @@ export async function getDashboardData(): Promise<DashboardData> {
     personasSinRegistro,
     porCliente,
   };
+}
+
+// ============================================================
+// ALERTAS DE GESTIÓN
+// ============================================================
+
+const ALERTA_SELECT =
+  "*, clientes(nombre), proyectos(nombre), personas(nombre, apellido)";
+
+const TIPO_ORDEN: Record<AlertaTipo, number> = {
+  critica: 0,
+  importante: 1,
+  seguimiento: 2,
+};
+
+// Orden: crítica primero, luego por fecha límite ascendente (sin fecha al final),
+// finalmente por antigüedad. Se ordena en memoria porque `tipo` es texto.
+function ordenarAlertas(rows: AlertaGestion[]): AlertaGestion[] {
+  return [...rows].sort((a, b) => {
+    if (TIPO_ORDEN[a.tipo] !== TIPO_ORDEN[b.tipo])
+      return TIPO_ORDEN[a.tipo] - TIPO_ORDEN[b.tipo];
+    const fa = a.fecha_limite ?? "9999-12-31";
+    const fb = b.fecha_limite ?? "9999-12-31";
+    if (fa !== fb) return fa < fb ? -1 : 1;
+    return a.created_at < b.created_at ? -1 : 1;
+  });
+}
+
+// Alertas activas (pendiente + en gestión) para el dashboard.
+export async function getAlertasActivas(): Promise<AlertaGestion[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("alertas_gestion")
+    .select(ALERTA_SELECT)
+    .in("estado", ["pendiente", "en_gestion"]);
+  return ordenarAlertas((data ?? []) as AlertaGestion[]);
+}
+
+// Todas las alertas (para la página de gestión /alertas).
+export async function getTodasLasAlertas(): Promise<AlertaGestion[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("alertas_gestion").select(ALERTA_SELECT);
+  return ordenarAlertas((data ?? []) as AlertaGestion[]);
+}
+
+// Proyectos activos con su nivel de criticidad derivado de las alertas activas
+// asociadas (al proyecto o a su cliente). Alimenta la Zona 3 del dashboard.
+export interface ProyectoCritico {
+  id: string;
+  nombre: string;
+  cliente: string | null;
+  estado: ProyectoEstado;
+  criticidad: AlertaTipo | "normal";
+}
+
+const CRIT_ORDEN: Record<AlertaTipo | "normal", number> = {
+  critica: 0,
+  importante: 1,
+  seguimiento: 2,
+  normal: 3,
+};
+
+export async function getProyectosCriticos(): Promise<ProyectoCritico[]> {
+  const supabase = await createClient();
+  const [proyectosR, clientesR, alertasR] = await Promise.all([
+    supabase.from("proyectos").select("*").eq("estado", "activo"),
+    supabase.from("clientes").select("*"),
+    supabase
+      .from("alertas_gestion")
+      .select("tipo, cliente_id, proyecto_id")
+      .in("estado", ["pendiente", "en_gestion"]),
+  ]);
+  const clientes = byId<Cliente>(clientesR.data as Cliente[]);
+  const alertas = (alertasR.data ?? []) as {
+    tipo: AlertaTipo;
+    cliente_id: string | null;
+    proyecto_id: string | null;
+  }[];
+
+  return ((proyectosR.data ?? []) as Proyecto[])
+    .map((p) => {
+      const rel = alertas.filter(
+        (a) => a.proyecto_id === p.id || a.cliente_id === p.cliente_id,
+      );
+      const criticidad: AlertaTipo | "normal" = rel.some(
+        (a) => a.tipo === "critica",
+      )
+        ? "critica"
+        : rel.some((a) => a.tipo === "importante")
+          ? "importante"
+          : rel.some((a) => a.tipo === "seguimiento")
+            ? "seguimiento"
+            : "normal";
+      return {
+        id: p.id,
+        nombre: p.nombre,
+        cliente: clientes.get(p.cliente_id)?.nombre ?? null,
+        estado: p.estado,
+        criticidad,
+      };
+    })
+    .sort(
+      (a, b) =>
+        CRIT_ORDEN[a.criticidad] - CRIT_ORDEN[b.criticidad] ||
+        a.nombre.localeCompare(b.nombre),
+    );
 }
 
 // ============================================================

@@ -27,6 +27,15 @@ function DashboardIcon(p: IconProps) {
   );
 }
 
+function AlertasIcon(p: IconProps) {
+  return (
+    <svg {...S(p)}>
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+      <path d="M12 9v4M12 17h.01" />
+    </svg>
+  );
+}
+
 function PersonasIcon(p: IconProps) {
   return (
     <svg {...S(p)}>
@@ -99,6 +108,7 @@ export interface NavItem {
 
 export const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", Icon: DashboardIcon, exact: true },
+  { href: "/alertas", label: "Alertas", Icon: AlertasIcon },
   { href: "/personas", label: "Personas", Icon: PersonasIcon },
   { href: "/clientes", label: "Clientes", Icon: ClientesIcon },
   { href: "/proyectos", label: "Proyectos", Icon: ProyectosIcon },

@@ -28,6 +28,15 @@ export type CargaTrabajo =
   | "ocioso";
 export type AppRole = "admin" | "viewer";
 
+export type AlertaTipo = "critica" | "importante" | "seguimiento";
+export type AlertaEstado = "pendiente" | "en_gestion" | "resuelta";
+export type AlertaCategoria =
+  | "personas"
+  | "proyectos"
+  | "clientes"
+  | "contratos"
+  | "operacional";
+
 export interface Persona {
   id: string;
   nombre: string;
@@ -104,6 +113,25 @@ export interface RegistroSemanal {
   updated_at: string;
 }
 
+export interface AlertaGestion {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  tipo: AlertaTipo;
+  estado: AlertaEstado;
+  categoria: AlertaCategoria | null;
+  cliente_id: string | null;
+  proyecto_id: string | null;
+  persona_id: string | null;
+  fecha_limite: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joins opcionales (PostgREST embeds)
+  clientes?: { nombre: string } | null;
+  proyectos?: { nombre: string } | null;
+  personas?: { nombre: string; apellido: string } | null;
+}
+
 // ---------- Etiquetas visibles (DB -> UI) ----------
 
 export const TIPO_TRABAJO_LABEL: Record<TipoTrabajo, string> = {
@@ -170,3 +198,32 @@ export const TIPO_CONTRATO_LABEL: Record<TipoContrato, string> = {
   interno: "Interno (PlexoTech)",
   cliente: "Financiado por cliente",
 };
+
+// ---------- Alertas de gestión ----------
+
+export const ALERTA_TIPO_LABEL: Record<AlertaTipo, string> = {
+  critica: "Crítica",
+  importante: "Importante",
+  seguimiento: "Seguimiento",
+};
+
+export const ALERTA_ESTADO_LABEL: Record<AlertaEstado, string> = {
+  pendiente: "Pendiente",
+  en_gestion: "En gestión",
+  resuelta: "Resuelta",
+};
+
+export const ALERTA_CATEGORIA_LABEL: Record<AlertaCategoria, string> = {
+  personas: "Personas",
+  proyectos: "Proyectos",
+  clientes: "Clientes",
+  contratos: "Contratos",
+  operacional: "Operacional",
+};
+
+// Orden semántico (de mayor a menor urgencia)
+export const ALERTA_TIPO_ORDEN: AlertaTipo[] = [
+  "critica",
+  "importante",
+  "seguimiento",
+];
