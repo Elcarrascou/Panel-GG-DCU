@@ -49,7 +49,7 @@ export function PersonasTable({
   }, [rows, q, cliente, carga, soloActivos]);
 
   const inputCls =
-    "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40";
+    "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40";
 
   return (
     <div>
@@ -89,7 +89,7 @@ export function PersonasTable({
             type="checkbox"
             checked={soloActivos}
             onChange={(e) => setSoloActivos(e.target.checked)}
-            className="h-4 w-4 accent-[#6CD45A]"
+            className="h-4 w-4 accent-primary-dark"
           />
           Solo activos
         </label>
@@ -157,7 +157,7 @@ export function PersonasTable({
                 <td className="px-4 py-3 text-right">
                   <Link
                     href={`/personas/${r.id}`}
-                    className="text-xs font-medium text-[#2f6b27] hover:underline"
+                    className="text-xs font-medium text-green-ink hover:underline"
                   >
                     Ver ficha →
                   </Link>

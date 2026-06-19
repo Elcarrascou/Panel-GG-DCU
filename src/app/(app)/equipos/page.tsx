@@ -33,7 +33,7 @@ export default async function EquiposPage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {equipos.map((e) => (
             <Link key={e.id} href={`/equipos/${e.id}`}>
-              <Card className="h-full transition-colors hover:border-[#8EF67C]">
+              <Card className="h-full transition-colors hover:border-primary">
                 <CardBody>
                   <p className="font-medium text-ink">{e.nombre}</p>
                   <p className="mt-1 text-xs text-muted">

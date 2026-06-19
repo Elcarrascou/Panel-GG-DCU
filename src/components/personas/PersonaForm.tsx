@@ -63,7 +63,7 @@ export function PersonaForm({ persona }: { persona?: Persona }) {
               type="checkbox"
               name="activo"
               defaultChecked={persona.activo}
-              className="h-4 w-4 accent-[#6CD45A]"
+              className="h-4 w-4 accent-primary-dark"
             />
             Persona activa
           </label>

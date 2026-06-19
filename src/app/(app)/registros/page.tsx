@@ -57,7 +57,7 @@ export default async function RegistrosPage({
                 type="date"
                 name="semana"
                 defaultValue={semana}
-                className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40"
+                className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </label>
             <button className="rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-medium text-ink hover:bg-gray-50">
@@ -122,7 +122,7 @@ export default async function RegistrosPage({
                   {admin && (
                     <Link
                       href={`/registros/nuevo?persona_id=${e.persona.id}&semana=${semana}`}
-                      className="text-xs font-medium text-[#2f6b27] hover:underline"
+                      className="text-xs font-medium text-green-ink hover:underline"
                     >
                       {r ? "Editar" : "Registrar"}
                     </Link>

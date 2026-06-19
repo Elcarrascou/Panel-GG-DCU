@@ -40,7 +40,7 @@ export function Logo({
               onDark ? "text-white" : "text-ink"
             }`}
           >
-            Plexo<span className="text-[#8EF67C]">Tech</span>
+            Plexo<span className="text-primary">Tech</span>
           </span>
         </div>
       )}

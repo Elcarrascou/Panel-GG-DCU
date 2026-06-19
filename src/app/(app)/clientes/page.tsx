@@ -53,7 +53,7 @@ export default async function ClientesPage() {
               <TD className="text-right">
                 <Link
                   href={`/clientes/${c.id}`}
-                  className="text-xs font-medium text-[#2f6b27] hover:underline"
+                  className="text-xs font-medium text-green-ink hover:underline"
                 >
                   Ver →
                 </Link>

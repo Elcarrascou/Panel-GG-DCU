@@ -7,7 +7,7 @@ export function Avatar({
 }) {
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-onyx font-semibold text-[#8EF67C]"
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-onyx font-semibold text-primary"
       style={{ width: size, height: size, fontSize: size * 0.36 }}
     >
       {iniciales || "?"}

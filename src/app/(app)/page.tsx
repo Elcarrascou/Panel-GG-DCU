@@ -165,7 +165,7 @@ function AlertList({
           {registrarSemana ? (
             <Link
               href={`/registros/nuevo?persona_id=${p.id}&semana=${registrarSemana}`}
-              className="text-xs font-semibold text-[#2f6b27] hover:underline"
+              className="text-xs font-semibold text-green-ink hover:underline"
             >
               Registrar →
             </Link>

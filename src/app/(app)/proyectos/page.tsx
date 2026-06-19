@@ -53,7 +53,7 @@ export default async function ProyectosPage() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {grupos.get(cli)!.map((p) => (
                   <Link key={p.id} href={`/proyectos/${p.id}`}>
-                    <Card className="h-full transition-colors hover:border-[#8EF67C]">
+                    <Card className="h-full transition-colors hover:border-primary">
                       <CardBody>
                         <div className="flex items-start justify-between gap-2">
                           <p className="font-medium text-ink">{p.nombre}</p>

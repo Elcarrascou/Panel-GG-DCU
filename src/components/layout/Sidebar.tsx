@@ -27,7 +27,7 @@ export function Sidebar({ role }: { role: AppRole }) {
               aria-current={active ? "page" : undefined}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm [transition:background-color_var(--dur-ui)_var(--ease-out),color_var(--dur-ui)_var(--ease-out)] ${
                 active
-                  ? "bg-[#8EF67C] font-semibold text-onyx"
+                  ? "bg-primary font-semibold text-onyx"
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               }`}
             >

@@ -138,7 +138,7 @@ export default async function ProyectoDetallePage({
             <ul className="divide-y divide-border">
               {hitos.map((h, i) => (
                 <li key={i} className="px-5 py-3 text-sm">
-                  <span className="text-[#2f6b27]">★</span>{" "}
+                  <span className="text-green-ink">★</span>{" "}
                   <span className="text-ink">{h.texto}</span>
                   <span className="ml-2 text-xs text-muted">— {h.persona}</span>
                 </li>

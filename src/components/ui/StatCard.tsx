@@ -16,7 +16,7 @@ export function StatCard({
   return (
     <div
       className={`rounded-xl border bg-surface p-5 shadow-sm ${
-        accent ? "border-[#8EF67C]" : "border-border"
+        accent ? "border-primary" : "border-border"
       }`}
     >
       <p className="text-xs font-medium uppercase tracking-wide text-muted">
@@ -27,7 +27,7 @@ export function StatCard({
           tone === "alert"
             ? "text-red-600"
             : tone === "ok"
-              ? "text-[#2f6b27]"
+              ? "text-green-ink"
               : "text-ink"
         }`}
       >

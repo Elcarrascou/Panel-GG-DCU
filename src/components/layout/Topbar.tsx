@@ -9,7 +9,7 @@ export function Topbar({ user }: { user: SessionUser }) {
       <div className="flex items-center gap-2 md:hidden">
         <MobileNav role={user.role} />
         <span className="text-base font-bold tracking-tight text-ink">
-          Plexo<span className="text-[#6CD45A]">Tech</span>
+          Plexo<span className="text-primary-dark">Tech</span>
         </span>
       </div>
       <div className="hidden text-sm text-muted md:block">

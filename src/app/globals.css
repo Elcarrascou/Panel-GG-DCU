@@ -9,6 +9,7 @@
   /* Colores de marca */
   --color-primary: #8ef67c; /* Spring Green */
   --color-primary-dark: #6cd45a; /* hover */
+  --color-green-ink: #2f6b27; /* verde legible para texto/links sobre claro */
   --color-surface-dark: #2f2e2e; /* Onyx Black */
   --color-jet: #000000;
   --color-white: #ffffff;
@@ -39,6 +40,7 @@
 @theme inline {
   --color-primary: var(--color-primary);
   --color-primary-dark: var(--color-primary-dark);
+  --color-green-ink: var(--color-green-ink);
   --color-onyx: var(--color-surface-dark);
   --color-jet: var(--color-jet);
 

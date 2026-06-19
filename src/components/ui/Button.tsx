@@ -8,7 +8,7 @@ const BASE =
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-[#8EF67C] text-onyx hover:bg-[#6CD45A] font-semibold shadow-sm",
+    "bg-primary text-onyx hover:bg-primary-dark font-semibold shadow-sm",
   secondary:
     "bg-onyx text-white hover:bg-black",
   ghost:

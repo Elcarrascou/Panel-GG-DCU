@@ -109,7 +109,7 @@ export default async function PersonaDetallePage({
                           <div className="flex items-center gap-3">
                             <Link
                               href={`/personas/${id}/mover/${a.id}`}
-                              className="text-xs font-medium text-[#2f6b27] hover:underline"
+                              className="text-xs font-medium text-green-ink hover:underline"
                             >
                               Mover
                             </Link>
@@ -151,7 +151,7 @@ export default async function PersonaDetallePage({
                     </p>
                     <Link
                       href={`/registros/nuevo?persona_id=${id}&semana=${semana}`}
-                      className="text-xs font-semibold text-[#2f6b27] hover:underline"
+                      className="text-xs font-semibold text-green-ink hover:underline"
                     >
                       Registrar esta semana →
                     </Link>
@@ -214,7 +214,7 @@ export default async function PersonaDetallePage({
                     <p className="mt-1 text-sm text-muted">{r.resumen}</p>
                   )}
                   {r.hitos && (
-                    <p className="mt-1 text-xs text-[#2f6b27]">
+                    <p className="mt-1 text-xs text-green-ink">
                       ★ {r.hitos}
                     </p>
                   )}
@@ -270,7 +270,7 @@ function RegistroReadOnly({
         <p className="text-sm text-muted">{registro.resumen}</p>
       )}
       {registro.hitos && (
-        <p className="text-xs text-[#2f6b27]">★ {registro.hitos}</p>
+        <p className="text-xs text-green-ink">★ {registro.hitos}</p>
       )}
     </div>
   );
