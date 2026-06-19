@@ -14,7 +14,7 @@ App de **tracking de RRHH para PlexoTech**: quién trabaja en qué cliente/proye
 |------|--------|
 | Esquema Supabase + RLS + seed | ✅ Aplicado (5 migraciones) |
 | Auth (admin/viewer) + usuarios | ✅ Creados y probados |
-| Frontend Next.js 15 (todos los módulos) | ✅ Build verde, 24 rutas |
+| Frontend Next.js 15 (todos los módulos) | ✅ Build verde, 25 rutas |
 | Endpoint Fase 2 (`/api/ingest`) | ✅ Probado (upsert OK, 401/404 OK) |
 | Verificación en navegador (login→dashboard→personas) | ✅ OK con data real |
 | Git local (commit inicial) | ✅ 76 archivos |
@@ -96,7 +96,7 @@ Helper de rol: `public.is_admin()` (SECURITY DEFINER) — usado en RLS y en el c
 
 ### Tablas
 - **`personas`**: id, nombre, apellido, segundo_apellido?, rut(unique), cargo?, tipo_contrato, activo, timestamps.
-- **`clientes`**: id, nombre(unique), tipo(`cliente_tipo`), estado, descripcion?, timestamps. *(El campo `tipo` distingue cliente externo vs área interna — no estaba en el doc original §5 pero sí en el seed §7; se agregó.)*
+- **`clientes`**: id, nombre(unique), tipo(`cliente_tipo`), estado, descripcion?, timestamps. *(El campo `tipo` distingue cliente externo vs área interna — no estaba en el doc original §5 pero sí en el seed §7; se agregó.)* **+ Contexto estratégico (migración 06, M5):** `contexto_actual`, `ultimos_eventos`, `proximos_pasos`, `proyectos_futuros`, `contactos_cliente`, `notas_estrategicas` — todos `text` nullable, texto libre.
 - **`proyectos`**: id, nombre, cliente_id(FK→clientes, restrict), estado, descripcion?, fecha_inicio?, fecha_fin?, timestamps.
 - **`equipos`**: id, nombre, cliente_id(FK), proyecto_id?(FK, set null), timestamps.
 - **`asignaciones`**: id, persona_id(FK), cliente_id?(FK), proyecto_id?(FK), equipo_id?(FK), rol_equipo, fecha_inicio, **fecha_fin? (NULL = activa)**, timestamps. **Soft delete: nunca borrar, cerrar con fecha_fin.**
@@ -120,6 +120,7 @@ Helper de rol: `public.is_admin()` (SECURITY DEFINER) — usado en RLS y en el c
 3. `03_seed_personas_asignaciones`
 4. `04_ingest_fase2` (tabla app_settings + RPC `ingest_registro_semanal`)
 5. `05_security_hardening` (search_path en set_updated_at; revoke EXECUTE en funciones definer)
+6. `06_clientes_contexto_estrategico` (6 columnas text de contexto estratégico en `clientes`) — M5
 
 > Para ver migraciones: `mcp__supabase__list_migrations`. Para nuevas DDL: `apply_migration`. Para queries: `execute_sql`.
 
@@ -141,7 +142,8 @@ src/
       personas/nueva/page.tsx
       personas/[id]/page.tsx         # ficha (asignaciones, registro semana, historial)
       personas/[id]/editar/page.tsx
-      clientes/{page,nuevo,[id],[id]/editar}
+      clientes/{page,nuevo,[id],[id]/editar}    # [id] = ficha con Zona A operacional + Zona B contexto estratégico (M5)
+    clientes/presentacion/page.tsx     # M5: modo presentación FUERA del grupo (app) → sin sidebar/topbar, fullscreen onyx
       proyectos/{page,nuevo,[id],[id]/editar}
       equipos/{page,nuevo,[id],[id]/editar}
       registros/page.tsx             # vista semanal (cobertura, form GET por semana)
@@ -155,7 +157,9 @@ src/
     charts/    CargaBar (barra apilada + leyenda), Donut (SVG)
     layout/    Logo, Sidebar(client, usePathname), Topbar, LogoutButton(client)
     personas/  PersonasTable(client, filtros), PersonaForm
-    clientes/  ClienteForm
+    clientes/  ClienteForm (+ sección contexto estratégico M5),
+               ContextoEstrategico (server, Zona B de la ficha, íconos SVG),
+               PresentacionView (client, slideshow + window.print, M5)
     proyectos/ ProyectoForm
     equipos/   EquipoForm, EquipoMiembroForm
     asignaciones/ AsignacionForm
@@ -213,7 +217,7 @@ README.md  HANDOFF.md
 
 ## 9. Verificación realizada
 
-- `npm run build` ✅ (24 rutas, sin errores; warning benigno de edge-runtime por supabase-js en middleware). La ruta nueva es `/personas/[id]/mover/[asignacionId]` (M3).
+- `npm run build` ✅ (25 rutas, sin errores; warning benigno de edge-runtime por supabase-js en middleware). Rutas nuevas: `/personas/[id]/mover/[asignacionId]` (M3) y `/clientes/presentacion` (M5).
 - Servidor `npm start` + Claude_Preview: login con admin → Dashboard renderiza con data real (42 personas, donut por cliente correcto, 9 clientes). Lista de Personas: 42/42, badges, filtros OK.
 - Ingest probado por curl: secreto correcto → `ok:true`; secreto malo → 401; RUT inexistente → 404.
 - `get_advisors security` corrido; ítems corregibles arreglados en migración 05. Quedan (por diseño/config, no bloquean): `app_settings` sin policy (lock intencional), `ingest_registro_semanal` ejecutable por anon (secret-gated, intencional), y leaked-password protection desactivado (config de Auth, activar en dashboard).
@@ -234,6 +238,14 @@ README.md  HANDOFF.md
 - [x] **M2 — Selects dependientes cliente → proyecto/equipo.** En `AsignacionForm`, `EquipoForm` y `MoverPersonaForm`: al elegir cliente se filtran proyectos activos (y equipos) de ese cliente con `useState`, reset al cambiar. Placeholders "Selecciona primero un cliente" / "Sin proyectos activos". *Implementado filtrando el array que ya entrega `getOpciones` (sin fetch al browser client): sin red, sin estados de carga, sin edge cases de auth.*
 - [x] **M3 — "Mover persona" en un paso.** Botón "Mover" junto a cada asignación activa en la ficha + ruta `/personas/[id]/mover/[asignacionId]` con `MoverPersonaForm`. Server Action `moverPersona`: cierra la asignación actual (`fecha_fin = inicio_nuevo − 1 día`) y crea la nueva; si falla el insert reabre la anterior (compensación, sin cambiar esquema). Banner de confirmación dinámico ("Se cerrará … con X y se creará una nueva con Y").
 - [x] **M4 — "Registrar semana" directo desde el dashboard.** Links "Registrar →" en la alerta "Pendientes de registro" del dashboard y banner en la ficha de persona → `/registros/nuevo?persona_id=[id]&semana=[lunes]`. La página precarga y **bloquea** persona y semana (intención explícita); `RegistroForm` admite `lockPersona`/`lockSemana`. La tabla `/registros` también usa `persona_id`.
+- [x] **M5 — Contexto estratégico de clientes + modo presentación ejecutiva** (commit `cc9ef41`, 2026-06-19 — verificado en navegador y pusheado; Vercel redespliega). Daniel (Admin/PMO) escribe el contexto, el GG lo consume.
+  - **DB:** migración `06` agrega 6 columnas `text` nullable a `clientes` (`contexto_actual`, `ultimos_eventos`, `proximos_pasos`, `proyectos_futuros`, `contactos_cliente`, `notas_estrategicas`). `get_advisors` sin nuevos hallazgos. Tipo `Cliente` y `guardarCliente` actualizados (las queries usan `select("*")`, sin cambios). `getClientesPresentacion()` nueva en `data.ts` (clientes activos + equipo asignado con carga).
+  - **Ficha `/clientes/[id]`:** Zona A operacional intacta; nueva **Zona B "Contexto estratégico"** (`ContextoEstrategico.tsx`, server) que renderiza solo las secciones con contenido, `whitespace-pre-wrap`, íconos SVG stroke en verde, badge "PMO".
+  - **Form `ClienteForm`:** sección "Contexto estratégico" con 6 `<textarea>` + placeholders, separada con `border-t`. Mantiene `useActionState` (M1).
+  - **Listado `/clientes`:** badge "Acción pendiente" (punto `bg-primary-dark`) cuando el cliente tiene `proximos_pasos`. Botón **"▶ Presentar"** (ghost) visible para ambos roles.
+  - **`/clientes/presentacion`** (`PresentacionView.tsx`, client): ruta **fuera del grupo `(app)`** → no hereda sidebar/topbar (fullscreen). Protegida por middleware + `getCurrentUser` (admin y viewer). Fondo onyx, acento Spring Green, slideshow (botones Anterior/Siguiente, puntos, flechas de teclado ←/→ y PageUp/Down), barra con Imprimir (`window.print`) y "Salir de presentación". Una `<article>` por cliente activo; en pantalla se muestra la activa, **en impresión se muestran todas** (`print:block` + `print:break-after-page`) con colores claros. Muestra contexto/eventos/pasos/proyectos + equipo; **oculta `contactos_cliente` y `notas_estrategicas`** (internos). Slides sin contenido estratégico muestran solo encabezado + equipo.
+  - **Gotcha de routing:** colocar `presentacion` en `src/app/clientes/` (no en `src/app/(app)/clientes/`) es lo que la libra del layout con sidebar; el build no genera conflicto porque `presentacion` es un segmento estático único (no choca con `[id]`).
+  - **Dato de prueba:** durante la verificación se rellenaron los 6 campos de **Consorcio** (`67715f2e-1a67-4fad-a015-af3ed7540f1d`) con texto de ejemplo realista — sigue en la DB de producción. Limpiar/editar desde la ficha si se quiere data en blanco.
 - [ ] Exportar reportes a PDF/Excel real (hoy = `window.print()`).
 - [ ] Generar tipos TS desde Supabase (`mcp__supabase__generate_typescript_types`) en vez de los tipos manuales en `types.ts`.
 - [ ] Confirmar con el negocio: ¿más tipos de trabajo / roles de equipo? ¿login propio del GG?
@@ -277,5 +289,5 @@ Alternativa CLI: `npx vercel` (interactivo, pide login y linkeo) → luego setea
 
 ---
 
-**Último cambio: 2026-06-18.**
-Commit `52b2b83` — M1/M2/M3/M4 implementadas y en producción.
+**Último cambio: 2026-06-19.**
+Commit `cc9ef41` — M5 (contexto estratégico de clientes + modo presentación ejecutiva). Previas: `52b2b83` M1/M2/M3/M4.
