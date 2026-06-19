@@ -3,17 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
+import { NAV, isActive } from "./nav";
 import type { AppRole } from "@/lib/types";
-
-const NAV = [
-  { href: "/", label: "Dashboard", icon: "▦", exact: true },
-  { href: "/personas", label: "Personas", icon: "◧" },
-  { href: "/clientes", label: "Clientes", icon: "◩" },
-  { href: "/proyectos", label: "Proyectos", icon: "◪" },
-  { href: "/equipos", label: "Equipos", icon: "◫" },
-  { href: "/registros", label: "Registros semanales", icon: "▤" },
-  { href: "/reportes", label: "Reportería", icon: "▣" },
-];
 
 export function Sidebar({ role }: { role: AppRole }) {
   const pathname = usePathname();
@@ -28,22 +19,19 @@ export function Sidebar({ role }: { role: AppRole }) {
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {NAV.map((item) => {
-          const active = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
+          const active = isActive(pathname, item);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+              aria-current={active ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm [transition:background-color_var(--dur-ui)_var(--ease-out),color_var(--dur-ui)_var(--ease-out)] ${
                 active
                   ? "bg-[#8EF67C] font-semibold text-onyx"
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               }`}
             >
-              <span className="w-4 text-center text-base leading-none opacity-80">
-                {item.icon}
-              </span>
+              <item.Icon className={active ? "opacity-100" : "opacity-80"} />
               {item.label}
             </Link>
           );

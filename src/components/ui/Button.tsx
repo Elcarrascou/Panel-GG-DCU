@@ -4,7 +4,7 @@ import { type ButtonHTMLAttributes, type ReactNode } from "react";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium [transition:background-color_var(--dur-press)_var(--ease-out),transform_var(--dur-press)_var(--ease-out)] active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100";
 
 const VARIANTS: Record<Variant, string> = {
   primary:

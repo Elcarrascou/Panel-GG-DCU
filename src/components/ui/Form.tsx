@@ -6,7 +6,7 @@ import {
 } from "react";
 
 const FIELD =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-[#6CD45A] focus:outline-none focus:ring-2 focus:ring-[#8EF67C]/40";
 
 export function Field({
   label,
@@ -29,7 +29,7 @@ export function Field({
       </span>
       {children}
       {error ? (
-        <span className="mt-1 block text-sm text-red-500">{error}</span>
+        <span className="mt-1 block text-xs font-medium text-red-600">{error}</span>
       ) : (
         hint && <span className="mt-1 block text-xs text-muted">{hint}</span>
       )}
@@ -40,7 +40,7 @@ export function Field({
 // Error general del formulario (bajo el botón de submit).
 export function FormError({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <p className="text-sm text-red-500">{message}</p>;
+  return <p className="text-sm font-medium text-red-600">{message}</p>;
 }
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {

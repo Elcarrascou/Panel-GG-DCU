@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# skills (tooling local, no es código de la app)
+/.agents/
+/.claude/skills/
+/skills-lock.json

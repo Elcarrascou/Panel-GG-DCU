@@ -26,6 +26,13 @@
   --color-carga-normal: #8ef67c;
   --color-carga-poco: #eab308;
   --color-carga-ocioso: #9ca3af;
+
+  /* Motion — curvas y duraciones de UI (Emil / impeccable) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 140ms;
+  --dur-ui: 200ms;
+  --dur-drawer: 260ms;
 }
 
 /* Tokens de tema -> generan utilidades Tailwind (bg-primary, text-onyx, ...) */
@@ -82,6 +89,18 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-primary-dark);
   outline-offset: 2px;
+}
+
+/* Reduced motion: degradar a casi instantáneo, sin movimiento */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @media print {
