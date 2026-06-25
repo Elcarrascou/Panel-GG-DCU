@@ -1,16 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { semanaActual } from "@/lib/format";
-import type {
-  AlertaGestion,
-  AlertaTipo,
-  Asignacion,
-  CargaTrabajo,
-  Cliente,
-  Equipo,
-  Persona,
-  Proyecto,
-  ProyectoEstado,
-  RegistroSemanal,
+import {
+  deriveHitoEstado,
+  type AlertaGestion,
+  type AlertaTipo,
+  type Asignacion,
+  type CargaTrabajo,
+  type Cliente,
+  type Equipo,
+  type Hito,
+  type HitoEstado,
+  type Persona,
+  type Proyecto,
+  type ProyectoEstado,
+  type RegistroSemanal,
+  type RolEquipo,
 } from "@/lib/types";
 
 // ---------- Tipos compuestos para la UI ----------
@@ -293,6 +297,106 @@ export async function getProyectoDetalle(id: string) {
         ) ?? null,
     })),
   };
+}
+
+// ============================================================
+// HITOS DE PROYECTO
+// ============================================================
+
+export interface HitoConEstado extends Hito {
+  // Estado derivado para mostrar (atrasado si venció sin fecha real).
+  estadoEfectivo: HitoEstado;
+}
+
+export interface ResumenHitos {
+  total: number;
+  cumplidos: number;
+  atrasados: number;
+  pendientes: number;
+}
+
+// Hitos de un proyecto, ordenados por fecha planificada, con estado efectivo.
+export async function getHitosProyecto(
+  proyectoId: string,
+): Promise<HitoConEstado[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hitos")
+    .select("*")
+    .eq("proyecto_id", proyectoId)
+    .order("fecha_planificada", { ascending: true });
+  return ((data ?? []) as Hito[]).map((h) => ({
+    ...h,
+    estadoEfectivo: deriveHitoEstado(h),
+  }));
+}
+
+// Resumen de hitos por proyecto (para badges en la lista de proyectos).
+export async function getHitosResumen(): Promise<Map<string, ResumenHitos>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hitos")
+    .select("proyecto_id, estado, fecha_planificada, fecha_real");
+  const rows = (data ?? []) as Pick<
+    Hito,
+    "proyecto_id" | "estado" | "fecha_planificada" | "fecha_real"
+  >[];
+  const map = new Map<string, ResumenHitos>();
+  for (const h of rows) {
+    const r = map.get(h.proyecto_id) ?? {
+      total: 0,
+      cumplidos: 0,
+      atrasados: 0,
+      pendientes: 0,
+    };
+    const est = deriveHitoEstado(h);
+    r.total++;
+    if (est === "cumplido") r.cumplidos++;
+    else if (est === "atrasado") r.atrasados++;
+    else if (est === "pendiente") r.pendientes++;
+    map.set(h.proyecto_id, r);
+  }
+  return map;
+}
+
+// Hitos críticos: atrasados o que vencen en los próximos 14 días, con su
+// proyecto y cliente. Alimenta el reporte y la presentación semanal.
+export interface HitoCritico extends HitoConEstado {
+  proyecto: string;
+  cliente: string | null;
+}
+
+export async function getHitosCriticos(): Promise<HitoCritico[]> {
+  const supabase = await createClient();
+  const [hitosR, proyectosR, clientesR] = await Promise.all([
+    supabase
+      .from("hitos")
+      .select("*")
+      .is("fecha_real", null)
+      .neq("estado", "cancelado"),
+    supabase.from("proyectos").select("*"),
+    supabase.from("clientes").select("*"),
+  ]);
+  const proyectos = byId<Proyecto>(proyectosR.data as Proyecto[]);
+  const clientes = byId<Cliente>(clientesR.data as Cliente[]);
+
+  const hoy = new Date();
+  const limite = new Date(hoy);
+  limite.setUTCDate(limite.getUTCDate() + 14);
+  const limiteIso = limite.toISOString().slice(0, 10);
+
+  return ((hitosR.data ?? []) as Hito[])
+    .filter((h) => h.fecha_planificada <= limiteIso)
+    .map((h) => {
+      const p = proyectos.get(h.proyecto_id) ?? null;
+      return {
+        ...h,
+        estadoEfectivo: deriveHitoEstado(h),
+        proyecto: p?.nombre ?? "—",
+        cliente: p ? (clientes.get(p.cliente_id)?.nombre ?? null) : null,
+      };
+    })
+    .sort((a, b) => a.fecha_planificada.localeCompare(b.fecha_planificada));
 }
 
 // ============================================================
@@ -610,6 +714,122 @@ export async function getProyectosCriticos(): Promise<ProyectoCritico[]> {
         CRIT_ORDEN[a.criticidad] - CRIT_ORDEN[b.criticidad] ||
         a.nombre.localeCompare(b.nombre),
     );
+}
+
+// ============================================================
+// PRESENTACIÓN SEMANAL (deck ejecutivo consolidado)
+// ============================================================
+
+export interface PresentacionSemanal {
+  semana: string;
+  resumen: {
+    clientesActivos: number;
+    proyectosActivos: number;
+    colaboradoresAsignados: number;
+    criticas: number;
+  };
+  clientes: {
+    cliente: Cliente;
+    proyectos: { nombre: string; estado: ProyectoEstado }[];
+    personas: { nombre: string; carga: CargaTrabajo | null; rol: RolEquipo }[];
+    decisiones: { titulo: string; tipo: AlertaTipo }[];
+  }[];
+  hitosCriticos: HitoCritico[];
+  situaciones: {
+    sinAsignacion: { id: string; nombre: string }[];
+    cargaBaja: { id: string; nombre: string; carga: CargaTrabajo }[];
+    decisionesPersonas: {
+      titulo: string;
+      tipo: AlertaTipo;
+      persona: string | null;
+    }[];
+  };
+  decisiones: AlertaGestion[];
+}
+
+export async function getPresentacionSemanal(): Promise<PresentacionSemanal> {
+  const [estados, presentClientes, alertas, proyectos, hitosCriticos] =
+    await Promise.all([
+      getPersonasConEstado(),
+      getClientesPresentacion(),
+      getAlertasActivas(),
+      getProyectos(),
+      getHitosCriticos(),
+    ]);
+
+  const activos = estados.filter((e) => e.persona.activo);
+  const colaboradoresAsignados = activos.filter(
+    (e) => e.activas.length > 0,
+  ).length;
+  const proyectosActivos = proyectos.filter((p) => p.estado === "activo");
+
+  // Clientes: externos primero, áreas internas (Plexotech) al final.
+  const ordenados = [...presentClientes].sort((a, b) => {
+    const ai = a.cliente.tipo === "interno" ? 1 : 0;
+    const bi = b.cliente.tipo === "interno" ? 1 : 0;
+    if (ai !== bi) return ai - bi;
+    return a.cliente.nombre.localeCompare(b.cliente.nombre);
+  });
+
+  const clientes = ordenados.map((pc) => ({
+    cliente: pc.cliente,
+    proyectos: proyectosActivos
+      .filter((p) => p.cliente_id === pc.cliente.id)
+      .map((p) => ({ nombre: p.nombre, estado: p.estado })),
+    personas: pc.personas.map((m) => ({
+      nombre: nombreCompletoPersona(m.persona),
+      carga: m.carga,
+      rol: m.rol,
+    })),
+    decisiones: alertas
+      .filter((a) => a.cliente_id === pc.cliente.id)
+      .map((a) => ({ titulo: a.titulo, tipo: a.tipo })),
+  }));
+
+  const sinAsignacion = activos
+    .filter((e) => e.activas.length === 0)
+    .map((e) => ({
+      id: e.persona.id,
+      nombre: nombreCompletoPersona(e.persona),
+    }));
+
+  const cargaBaja = activos
+    .filter((e) => {
+      const c = e.registroSemana?.carga_trabajo;
+      return c === "poco_trabajo" || c === "ocioso";
+    })
+    .map((e) => ({
+      id: e.persona.id,
+      nombre: nombreCompletoPersona(e.persona),
+      carga: e.registroSemana!.carga_trabajo as CargaTrabajo,
+    }));
+
+  const decisionesPersonas = alertas
+    .filter((a) => a.persona_id != null)
+    .map((a) => ({
+      titulo: a.titulo,
+      tipo: a.tipo,
+      persona: a.personas ? `${a.personas.nombre} ${a.personas.apellido}` : null,
+    }));
+
+  return {
+    semana: semanaActual(),
+    resumen: {
+      clientesActivos: presentClientes.length,
+      proyectosActivos: proyectosActivos.length,
+      colaboradoresAsignados,
+      criticas: alertas.filter((a) => a.tipo === "critica").length,
+    },
+    clientes,
+    hitosCriticos,
+    situaciones: { sinAsignacion, cargaBaja, decisionesPersonas },
+    decisiones: alertas,
+  };
+}
+
+// Nombre completo (evita import circular con format.ts ya importado arriba).
+function nombreCompletoPersona(p: Persona): string {
+  return [p.nombre, p.apellido, p.segundo_apellido].filter(Boolean).join(" ");
 }
 
 // ============================================================

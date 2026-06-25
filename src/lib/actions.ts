@@ -431,6 +431,69 @@ export async function guardarRegistro(
 }
 
 // ============================================================
+// HITOS DE PROYECTO
+// ============================================================
+
+export async function guardarHito(
+  _prev: FormState,
+  fd: FormData,
+): Promise<FormState> {
+  await assertAdmin();
+  const supabase = await createClient();
+  const id = str(fd, "id");
+  const proyecto_id = str(fd, "proyecto_id");
+
+  const titulo = str(fd, "titulo");
+  const fecha_planificada = str(fd, "fecha_planificada");
+
+  const fieldErrors: Record<string, string> = {};
+  if (!proyecto_id) fieldErrors.proyecto_id = "Falta el proyecto.";
+  if (!titulo) fieldErrors.titulo = "El título es obligatorio.";
+  if (!fecha_planificada)
+    fieldErrors.fecha_planificada = "Indica la fecha planificada.";
+  if (Object.keys(fieldErrors).length) return invalid(fieldErrors);
+
+  const fecha_real = str(fd, "fecha_real");
+  // Estado coherente: con fecha real => cumplido; 'cumplido' sin fecha real
+  // se degrada a pendiente (la lectura lo mostrará atrasado si venció).
+  let estado = str(fd, "estado") ?? "pendiente";
+  if (fecha_real) estado = "cumplido";
+  else if (estado === "cumplido") estado = "pendiente";
+
+  const payload = {
+    proyecto_id,
+    titulo,
+    descripcion: str(fd, "descripcion"),
+    fecha_planificada,
+    fecha_real,
+    estado,
+  };
+
+  if (id) {
+    const { error } = await supabase.from("hitos").update(payload).eq("id", id);
+    if (error) return { error: `No se pudo guardar el hito: ${error.message}` };
+  } else {
+    const { error } = await supabase.from("hitos").insert(payload);
+    if (error) return { error: `No se pudo crear el hito: ${error.message}` };
+  }
+  revalidatePath(`/proyectos/${proyecto_id}`);
+  revalidatePath("/proyectos");
+  redirect(`/proyectos/${proyecto_id}`);
+}
+
+export async function eliminarHito(fd: FormData) {
+  await assertAdmin();
+  const supabase = await createClient();
+  const id = str(fd, "id");
+  const proyecto_id = str(fd, "proyecto_id");
+  if (!id) throw new Error('El campo "Hito" es obligatorio.');
+  const { error } = await supabase.from("hitos").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar el hito: ${error.message}`);
+  if (proyecto_id) revalidatePath(`/proyectos/${proyecto_id}`);
+  revalidatePath("/proyectos");
+}
+
+// ============================================================
 // ALERTAS DE GESTIÓN
 // ============================================================
 

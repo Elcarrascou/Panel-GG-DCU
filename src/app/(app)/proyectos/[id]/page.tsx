@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getProyectoDetalle } from "@/lib/data";
+import { getProyectoDetalle, getHitosProyecto } from "@/lib/data";
 import { isAdmin } from "@/lib/auth";
+import { HitosManager } from "@/components/proyectos/HitosManager";
 import { nombreCompleto, iniciales, fechaCorta } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
@@ -24,7 +25,11 @@ export default async function ProyectoDetallePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [data, admin] = await Promise.all([getProyectoDetalle(id), isAdmin()]);
+  const [data, hitosProyecto, admin] = await Promise.all([
+    getProyectoDetalle(id),
+    getHitosProyecto(id),
+    isAdmin(),
+  ]);
   if (!data) notFound();
 
   const { proyecto, cliente, equipos, personasAsignadas } = data;
@@ -87,6 +92,28 @@ export default async function ProyectoDetallePage({
           </CardBody>
         </Card>
       )}
+
+      <Card className="mb-6">
+        <CardHeader
+          title="Hitos del proyecto"
+          subtitle={
+            hitosProyecto.length === 0
+              ? "Lo planificado vs lo ejecutado"
+              : `${hitosProyecto.filter((h) => h.estadoEfectivo === "cumplido").length}/${hitosProyecto.length} cumplidos${
+                  hitosProyecto.some((h) => h.estadoEfectivo === "atrasado")
+                    ? ` · ${hitosProyecto.filter((h) => h.estadoEfectivo === "atrasado").length} atrasado(s)`
+                    : ""
+                }`
+          }
+        />
+        <CardBody className="p-0">
+          <HitosManager
+            proyectoId={id}
+            hitos={hitosProyecto}
+            admin={admin}
+          />
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader

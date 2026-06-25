@@ -8,6 +8,7 @@ import {
 import { isAdmin } from "@/lib/auth";
 import { rangoSemana } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ButtonLink } from "@/components/ui/Button";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -38,6 +39,11 @@ export default async function DashboardPage() {
       <PageHeader
         title="Dashboard"
         subtitle={`Semana en curso · ${rangoSemana(d.semana)}`}
+        action={
+          <ButtonLink href="/presentacion/semanal">
+            ▶ Ver presentación semanal
+          </ButtonLink>
+        }
       />
 
       {/* ============ ZONA 1 — Decisiones y alertas críticas ============ */}

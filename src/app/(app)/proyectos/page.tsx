@@ -1,17 +1,22 @@
 import Link from "next/link";
-import { getProyectos } from "@/lib/data";
+import { getProyectos, getHitosResumen } from "@/lib/data";
 import { isAdmin } from "@/lib/auth";
 import { fechaCorta } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProyectoEstadoBadge } from "@/components/ui/Badges";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProyectosPage() {
-  const [proyectos, admin] = await Promise.all([getProyectos(), isAdmin()]);
+  const [proyectos, hitosResumen, admin] = await Promise.all([
+    getProyectos(),
+    getHitosResumen(),
+    isAdmin(),
+  ]);
 
   // Agrupar por cliente
   const grupos = new Map<string, typeof proyectos>();
@@ -51,28 +56,45 @@ export default async function ProyectosPage() {
                 {cli}
               </h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {grupos.get(cli)!.map((p) => (
-                  <Link key={p.id} href={`/proyectos/${p.id}`}>
-                    <Card className="h-full transition-colors hover:border-primary">
-                      <CardBody>
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-ink">{p.nombre}</p>
-                          <ProyectoEstadoBadge estado={p.estado} />
-                        </div>
-                        {p.descripcion && (
-                          <p className="mt-1 line-clamp-2 text-xs text-muted">
-                            {p.descripcion}
-                          </p>
-                        )}
-                        <p className="mt-3 text-xs text-muted">
-                          {p.fecha_inicio
-                            ? `Inicio ${fechaCorta(p.fecha_inicio)}`
-                            : "Sin fecha de inicio"}
-                        </p>
-                      </CardBody>
-                    </Card>
-                  </Link>
-                ))}
+                {grupos.get(cli)!.map((p) => {
+                  const rh = hitosResumen.get(p.id);
+                  return (
+                    <Link key={p.id} href={`/proyectos/${p.id}`}>
+                      <Card className="h-full transition-colors hover:border-primary">
+                        <CardBody>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-ink">{p.nombre}</p>
+                            <ProyectoEstadoBadge estado={p.estado} />
+                          </div>
+                          {p.descripcion && (
+                            <p className="mt-1 line-clamp-2 text-xs text-muted">
+                              {p.descripcion}
+                            </p>
+                          )}
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <p className="text-xs text-muted">
+                              {p.fecha_inicio
+                                ? `Inicio ${fechaCorta(p.fecha_inicio)}`
+                                : "Sin fecha de inicio"}
+                            </p>
+                            {rh && rh.total > 0 && (
+                              <span className="flex items-center gap-1.5">
+                                {rh.atrasados > 0 && (
+                                  <Badge tone="red">
+                                    {rh.atrasados} atrasado{rh.atrasados > 1 ? "s" : ""}
+                                  </Badge>
+                                )}
+                                <Badge tone="outline">
+                                  {rh.cumplidos}/{rh.total} hitos
+                                </Badge>
+                              </span>
+                            )}
+                          </div>
+                        </CardBody>
+                      </Card>
+                    </Link>
+                  );
+                })}
               </div>
             </section>
           ))}

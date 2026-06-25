@@ -104,6 +104,7 @@ Helper de rol: `public.is_admin()` (SECURITY DEFINER) — usado en RLS y en el c
 - **`profiles`**: id(FK→auth.users), email, nombre, role(app_role), created_at.
 - **`app_settings`**: key(PK), value. Guarda `ingest_secret`. **RLS habilitado SIN policies** → inaccesible por API; solo funciones SECURITY DEFINER lo leen (intencional).
 - **`alertas_gestion`** (M6): id, titulo, descripcion?, `tipo`(critica|importante|seguimiento, CHECK), `estado`(pendiente|en_gestion|resuelta, CHECK, default pendiente), `categoria`?(personas|proyectos|clientes|contratos|operacional, CHECK), cliente_id?/proyecto_id?/persona_id? (FK con `ON DELETE SET NULL`), fecha_limite?, timestamps. RLS: SELECT a `authenticated`, escritura solo `is_admin()`. Trigger updated_at. **No son enums Postgres sino `text` con CHECK** (a diferencia del resto del modelo).
+- **`hitos`** (M7, Adición v4): id, `proyecto_id`(FK→proyectos, **ON DELETE CASCADE**), titulo, descripcion?, fecha_planificada(date, NOT NULL), fecha_real?(date, NULL = no cumplido), `estado`(pendiente|cumplido|atrasado|cancelado, **text+CHECK**, default pendiente), timestamps. RLS por-comando estilo `alertas_gestion` (SELECT `true`, INSERT/UPDATE/DELETE `is_admin()`). Trigger `set_hitos_updated_at`. Índices en proyecto_id y fecha_planificada. **`atrasado` no se persiste**: se deriva en lectura (`deriveHitoEstado` en types.ts) cuando fecha_planificada < hoy y no hay fecha_real; el form solo escribe pendiente/cumplido/cancelado.
 
 ### RLS (resumen)
 - Tablas de datos (personas, clientes, proyectos, equipos, asignaciones, registros_semanales): `SELECT` a cualquier `authenticated` (`using true`); `INSERT/UPDATE/DELETE` solo si `public.is_admin()`.
@@ -123,6 +124,7 @@ Helper de rol: `public.is_admin()` (SECURITY DEFINER) — usado en RLS y en el c
 5. `05_security_hardening` (search_path en set_updated_at; revoke EXECUTE en funciones definer)
 6. `06_clientes_contexto_estrategico` (6 columnas text de contexto estratégico en `clientes`) — M5
 7. `07_alertas_gestion` (tabla `alertas_gestion` + RLS + trigger updated_at + índices) — M6
+8. `08_hitos` (tabla `hitos` + RLS por-comando + trigger updated_at + índices) — M7 (Adición v4)
 
 > Para ver migraciones: `mcp__supabase__list_migrations`. Para nuevas DDL: `apply_migration`. Para queries: `execute_sql`.
 
@@ -257,6 +259,11 @@ README.md  HANDOFF.md
   - **Componentes:** `components/alertas/AlertaCard.tsx` (server, reusable en dashboard y /alertas; botones-form llaman `cambiarEstadoAlerta`) y `CrearAlertaForm.tsx` (client).
   - **Nav:** ítem "Alertas" agregado a `nav.tsx` (lo consumen Sidebar y MobileNav).
 - [x] **Carga de datos de negocio v1.0** (2026-06-19, vía Supabase MCP `execute_sql`). Se eliminó la data ficticia (42 asignaciones placeholder del seed + 1 registro de prueba; clientes/proyectos/equipos quedaron intactos o vacíos) y se cargaron datos reales: contexto estratégico de 7 clientes, +Colmena y +Plexotech Interno, 6 proyectos, 9 equipos, 36 asignaciones activas, 4 registros semanales (semana lunes `2026-06-15`). Correcciones: Carlos Mellior→Mellor, Roberto Celedón inactivo, +Valeria Selman. **Ahora la DB de producción tiene data real, no seed.** Quedan 14 personas activas sin asignación (incluye PMO, GG, áreas internas, Joel Astete y Genaro Coñolef como casos a resolver). Colmena no tiene equipo asignado aún (el script de carga no incluyó asignaciones para Colmena).
+- [x] **M7 — Adiciones v4: Hitos por proyecto + Módulo de Reportes + Presentación semanal** (2026-06-25 — build verde 31 rutas, verificado en navegador con data real, `get_advisors` sin nuevos hallazgos; **commiteado y pusheado a `main`**, Vercel redespliega — ver git log).
+  - **Adición 2 — Hitos:** migración `08` (tabla `hitos`, ver §5). `types.ts`: `Hito`, `HitoEstado`, `HITO_ESTADO_LABEL/TONE/COLOR`, `deriveHitoEstado(hito, hoy)`. `data.ts`: `getHitosProyecto` (con `estadoEfectivo`), `getHitosResumen` (Map proyecto→{total,cumplidos,atrasados,pendientes} para badges de la lista), `getHitosCriticos` (atrasados o que vencen ≤14 días, con proyecto+cliente). `actions.ts`: `guardarHito` (useActionState; coherencia: con fecha real ⇒ cumplido, 'cumplido' sin fecha real ⇒ pendiente) y `eliminarHito` (button-form). UI: `components/proyectos/HitosManager.tsx` (**client**, tabla con semáforo 🟢🟡🔴⚫ + crear/editar/eliminar inline solo admin, confirm en delete) integrado en `/proyectos/[id]` (sección "Hitos del proyecto", distinta de "Hitos recientes" que sigue leyendo el texto libre de los registros). `/proyectos` lista: badge `X/Y hitos` + badge rojo si hay atrasados.
+  - **Adición 1 — Reportes:** `/reportes` reconvertida en **hub** (tarjetas: cliente/proyecto/colaborador con picker de entidades, + accesos directos a decisiones y semanal). El reporte agregado anterior se **preservó** movido a `/reportes/semanal`. Nuevos reportes imprimibles: `/reportes/cliente/[id]`, `/reportes/proyecto/[id]`, `/reportes/colaborador/[id]`, `/reportes/decisiones` — todos con `PrintButton` (`window.print`), `.print-full`, fecha de generación; reutilizan `getClienteDetalle`/`getProyectoDetalle`/`getPersonaDetalle`/`getHitosProyecto` + `getAlertasActivas` filtradas. (Sidebar/Topbar ya eran `no-print`.) Nota: usé la ruta `/reportes/colaborador/[id]` tal como pide el doc v4, aunque el resto de la app usa `/personas`.
+  - **Adición 3 — Presentación semanal:** `data.ts` `getPresentacionSemanal()` (consolida resumen, slide por cliente —externos primero, interno al final—, hitos críticos, situaciones de colaboradores —sin asignación / carga baja=poco_trabajo|ocioso / decisiones de personas—, decisiones). `components/presentacion/PresentacionSemanalView.tsx` (**client**, slideshow onyx, teclas ←/→, dots, "Salir"→dashboard). Ruta `/presentacion/semanal` **fuera del grupo `(app)`** (fullscreen, sin sidebar), accesible a ambos roles. Botón destacado "▶ Ver presentación semanal" en el header del dashboard.
+  - **Gotcha resuelto:** `/proyectos/[id]` ya tenía un `const hitos` local (hitos de texto libre de los registros); la variable nueva se llamó `hitosProyecto` para evitar el choque de identificador en el build.
 - [ ] Exportar reportes a PDF/Excel real (hoy = `window.print()`).
 - [ ] Generar tipos TS desde Supabase (`mcp__supabase__generate_typescript_types`) en vez de los tipos manuales en `types.ts`.
 - [ ] Confirmar con el negocio: ¿más tipos de trabajo / roles de equipo? ¿login propio del GG?
@@ -277,6 +284,8 @@ Alternativa CLI: `npx vercel` (interactivo, pide login y linkeo) → luego setea
 ---
 
 ## 12. Notas / gotchas para la próxima instancia
+
+> ⚠️ **REGLA OBLIGATORIA DE CIERRE — siempre completar `git commit` + `git push`.** Ninguna sesión termina con trabajo verificado sin commitear/pushear. Una vez que el build está verde y el cambio quedó verificado, el **último paso de toda sesión es `git add -A && git commit && git push` a `main`** (Vercel redespliega solo). Actualizar HANDOFF.md y la memoria como parte del mismo commit. No dejar cambios colgando en el working tree.
 
 - **GitHub MCP no sirve** (Bad credentials). Para git usar el **credential manager local** (`git config credential.helper` = `manager`, token del user `Elcarrascou`). Patrón usado (sin imprimir el token):
   - Crear repo: `git credential fill` → token → `curl` a `https://api.github.com/user/repos`.
@@ -313,5 +322,5 @@ El GG solo lee; el Admin crea/edita/resuelve. La seguridad real la da RLS (`is_a
 
 ---
 
-**Último cambio: 2026-06-19.**
-M6 (alertas de decisiones críticas + `/alertas`) y carga de datos de negocio v1.0 a producción. Previas: `cc9ef41` M5, `52b2b83` M1/M2/M3/M4.
+**Último cambio: 2026-06-25.**
+M7 (Adiciones v4: Hitos por proyecto + Módulo de Reportes + Presentación semanal; migración `08_hitos`; build verde 31 rutas) — commiteado y pusheado a `main`. Previas: `57943c4` M6 + carga de datos v1.0, `cc9ef41` M5, `52b2b83` M1/M2/M3/M4.

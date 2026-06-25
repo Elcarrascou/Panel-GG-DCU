@@ -28,6 +28,8 @@ export type CargaTrabajo =
   | "ocioso";
 export type AppRole = "admin" | "viewer";
 
+export type HitoEstado = "pendiente" | "cumplido" | "atrasado" | "cancelado";
+
 export type AlertaTipo = "critica" | "importante" | "seguimiento";
 export type AlertaEstado = "pendiente" | "en_gestion" | "resuelta";
 export type AlertaCategoria =
@@ -109,6 +111,18 @@ export interface RegistroSemanal {
   tipo_trabajo: TipoTrabajo | null;
   carga_trabajo: CargaTrabajo | null;
   hitos: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Hito {
+  id: string;
+  proyecto_id: string;
+  titulo: string;
+  descripcion: string | null;
+  fecha_planificada: string;
+  fecha_real: string | null;
+  estado: HitoEstado;
   created_at: string;
   updated_at: string;
 }
@@ -198,6 +212,46 @@ export const TIPO_CONTRATO_LABEL: Record<TipoContrato, string> = {
   interno: "Interno (PlexoTech)",
   cliente: "Financiado por cliente",
 };
+
+// ---------- Hitos de proyecto ----------
+
+export const HITO_ESTADO_LABEL: Record<HitoEstado, string> = {
+  pendiente: "Pendiente",
+  cumplido: "Cumplido",
+  atrasado: "Atrasado",
+  cancelado: "Cancelado",
+};
+
+// Semáforo: 🟢 cumplido · 🟡 pendiente (futuro) · 🔴 atrasado · ⚫ cancelado
+export const HITO_ESTADO_TONE: Record<
+  HitoEstado,
+  "green" | "amber" | "red" | "neutral"
+> = {
+  cumplido: "green",
+  pendiente: "amber",
+  atrasado: "red",
+  cancelado: "neutral",
+};
+
+export const HITO_ESTADO_COLOR: Record<HitoEstado, string> = {
+  cumplido: "#22c55e",
+  pendiente: "#eab308",
+  atrasado: "#ef4444",
+  cancelado: "#9ca3af",
+};
+
+// Estado efectivo para mostrar: si quedó como 'pendiente' pero la fecha
+// planificada ya pasó y no hay fecha real, se muestra 'atrasado'. Si hay
+// fecha real, se muestra 'cumplido'. No persiste — se deriva en cada lectura.
+export function deriveHitoEstado(
+  hito: Pick<Hito, "estado" | "fecha_planificada" | "fecha_real">,
+  hoy = new Date().toISOString().slice(0, 10),
+): HitoEstado {
+  if (hito.estado === "cancelado") return "cancelado";
+  if (hito.fecha_real) return "cumplido";
+  if (hito.fecha_planificada < hoy) return "atrasado";
+  return "pendiente";
+}
 
 // ---------- Alertas de gestión ----------
 

@@ -1,253 +1,166 @@
 import Link from "next/link";
 import {
-  getPersonasConEstado,
-  getCargaHistorica,
   getClientes,
+  getProyectos,
+  getOpciones,
+  getAlertasActivas,
 } from "@/lib/data";
-import { nombreCompleto, rangoSemana, semanaActual } from "@/lib/format";
+import { nombreCompleto } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { PrintButton } from "@/components/ui/PrintButton";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
-import { Table, THead, TH, TBody, TR, TD } from "@/components/ui/Table";
-import { CargaBadge } from "@/components/ui/CargaBadge";
 import { Badge } from "@/components/ui/Badge";
-import {
-  CARGA_COLOR,
-  CARGA_LABEL,
-  CARGA_ORDEN,
-  type CargaTrabajo,
-} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportesPage() {
-  const [estados, historica, clientes] = await Promise.all([
-    getPersonasConEstado(),
-    getCargaHistorica(),
+  const [clientes, proyectos, opciones, alertas] = await Promise.all([
     getClientes(),
+    getProyectos(),
+    getOpciones(),
+    getAlertasActivas(),
   ]);
-  const semana = semanaActual();
-  const activos = estados.filter((e) => e.persona.activo);
 
-  // --- Reporte por cliente: carga agregada ---
-  type Agg = { total: number; counts: Partial<Record<CargaTrabajo, number>> };
-  const porCliente = new Map<string, Agg>();
-  for (const c of clientes) porCliente.set(c.nombre, { total: 0, counts: {} });
-  for (const e of activos) {
-    const carga = e.registroSemana?.carga_trabajo ?? null;
-    const nombres = Array.from(
-      new Set(
-        e.activas
-          .map((a) => a.cliente?.nombre)
-          .filter((x): x is string => Boolean(x)),
-      ),
-    );
-    for (const n of nombres) {
-      const agg = porCliente.get(n) ?? { total: 0, counts: {} };
-      agg.total += 1;
-      if (carga) agg.counts[carga] = (agg.counts[carga] ?? 0) + 1;
-      porCliente.set(n, agg);
-    }
-  }
-  const clientesConGente = [...porCliente.entries()].filter(
-    ([, a]) => a.total > 0,
-  );
-
-  const sinAsignacion = activos.filter((e) => e.activas.length === 0);
+  const personas = opciones.personas;
+  const criticas = alertas.filter((a) => a.tipo === "critica").length;
+  const importantes = alertas.filter((a) => a.tipo === "importante").length;
 
   return (
-    <div className="print-full">
+    <div>
       <PageHeader
         title="Reportería"
-        subtitle={`Generado para semana · ${rangoSemana(semana)}`}
-        action={<PrintButton />}
+        subtitle="Reportes limpios e imprimibles (exportables a PDF desde el navegador)"
       />
 
-      {/* 1. Reporte semanal general */}
-      <Card className="mb-6">
-        <CardHeader
-          title="Reporte semanal general"
-          subtitle="Todas las personas activas, asignación actual y carga"
-        />
-        <CardBody className="p-0">
-          <Table>
-            <THead>
-              <TR>
-                <TH>Persona</TH>
-                <TH>Cargo</TH>
-                <TH>Asignación actual</TH>
-                <TH>Carga</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {activos.map((e) => {
-                const clientesN = Array.from(
-                  new Set(
-                    e.activas
-                      .map((a) => a.cliente?.nombre)
-                      .filter((x): x is string => Boolean(x)),
-                  ),
-                );
-                return (
-                  <TR key={e.persona.id}>
-                    <TD className="font-medium text-ink">
-                      {nombreCompleto(e.persona)}
-                    </TD>
-                    <TD className="text-muted">{e.persona.cargo ?? "—"}</TD>
-                    <TD>
-                      {clientesN.length ? (
-                        clientesN.join(", ")
-                      ) : (
-                        <span className="text-amber-700">Sin asignar</span>
-                      )}
-                    </TD>
-                    <TD>
-                      <CargaBadge carga={e.registroSemana?.carga_trabajo ?? null} />
-                    </TD>
-                  </TR>
-                );
-              })}
-            </TBody>
-          </Table>
-        </CardBody>
-      </Card>
+      {/* Reporte de decisiones + resumen semanal: accesos directos */}
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <Link href="/reportes/decisiones">
+          <Card className="h-full transition-colors hover:border-primary">
+            <CardBody className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-ink">Decisiones pendientes</p>
+                <p className="mt-1 text-xs text-muted">
+                  Todas las decisiones activas, críticas primero.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {criticas > 0 && <Badge tone="red">{criticas} crítica(s)</Badge>}
+                  {importantes > 0 && (
+                    <Badge tone="amber">{importantes} importante(s)</Badge>
+                  )}
+                  <Badge tone="outline">{alertas.length} en total</Badge>
+                </div>
+              </div>
+              <span className="text-muted">→</span>
+            </CardBody>
+          </Card>
+        </Link>
 
-      {/* 2. Reporte por cliente */}
+        <Link href="/reportes/semanal">
+          <Card className="h-full transition-colors hover:border-primary">
+            <CardBody className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-ink">
+                  Resumen semanal del equipo
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Carga, dotación por cliente e histórico semanal.
+                </p>
+                <div className="mt-3">
+                  <Badge tone="outline">{personas.length} persona(s)</Badge>
+                </div>
+              </div>
+              <span className="text-muted">→</span>
+            </CardBody>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Reporte por cliente */}
       <Card className="mb-6">
         <CardHeader
           title="Reporte por cliente / área"
-          subtitle="Dotación y distribución de carga del equipo"
-        />
-        <CardBody className="space-y-4">
-          {clientesConGente.map(([nombre, agg]) => (
-            <div key={nombre}>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-medium text-ink">{nombre}</span>
-                <span className="text-muted">{agg.total} persona(s)</span>
-              </div>
-              <MiniStacked counts={agg.counts} total={agg.total} />
-            </div>
-          ))}
-        </CardBody>
-      </Card>
-
-      {/* 3. Carga histórica */}
-      <Card className="mb-6">
-        <CardHeader
-          title="Carga histórica"
-          subtitle="Evolución semanal de la distribución de carga"
+          subtitle="Estado, contexto estratégico, proyectos, equipo y decisiones"
         />
         <CardBody>
-          {historica.length === 0 ? (
-            <p className="text-sm text-muted">
-              Aún no hay suficientes registros para mostrar tendencias.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {historica.map((wk) => {
-                const total = CARGA_ORDEN.reduce(
-                  (s, c) => s + (wk.counts[c] ?? 0),
-                  0,
-                );
-                return (
-                  <div key={wk.semana}>
-                    <p className="mb-1 text-xs font-medium text-muted">
-                      {rangoSemana(wk.semana)}
-                    </p>
-                    <MiniStacked counts={wk.counts} total={total} />
-                  </div>
-                );
-              })}
-              <Leyenda />
-            </div>
-          )}
+          <PickerGrid
+            items={clientes.map((c) => ({
+              id: c.id,
+              label: c.nombre,
+              href: `/reportes/cliente/${c.id}`,
+            }))}
+            empty="No hay clientes registrados."
+          />
         </CardBody>
       </Card>
 
-      {/* 4. Personas sin asignación */}
-      <Card id="sin-asignacion">
+      {/* Reporte por proyecto */}
+      <Card className="mb-6">
         <CardHeader
-          title="Personas sin asignación"
-          subtitle="Capacidad potencialmente disponible"
+          title="Reporte por proyecto"
+          subtitle="Cliente, equipo, hitos y contexto"
         />
-        <CardBody className="p-0">
-          {sinAsignacion.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-muted">
-              Todas las personas activas tienen asignación.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {sinAsignacion.map((e) => (
-                <li
-                  key={e.persona.id}
-                  className="flex items-center justify-between px-5 py-2.5"
-                >
-                  <Link
-                    href={`/personas/${e.persona.id}`}
-                    className="text-sm text-ink hover:underline"
-                  >
-                    {nombreCompleto(e.persona)}
-                  </Link>
-                  <Badge tone="outline">{e.persona.cargo ?? "—"}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+        <CardBody>
+          <PickerGrid
+            items={proyectos.map((p) => ({
+              id: p.id,
+              label: p.nombre,
+              sub: p.cliente?.nombre ?? undefined,
+              href: `/reportes/proyecto/${p.id}`,
+            }))}
+            empty="No hay proyectos registrados."
+          />
+        </CardBody>
+      </Card>
+
+      {/* Reporte por colaborador */}
+      <Card>
+        <CardHeader
+          title="Reporte por colaborador"
+          subtitle="Asignación actual, historial y decisiones asociadas"
+        />
+        <CardBody>
+          <PickerGrid
+            items={personas.map((p) => ({
+              id: p.id,
+              label: nombreCompleto(p),
+              sub: p.cargo ?? undefined,
+              href: `/reportes/colaborador/${p.id}`,
+            }))}
+            empty="No hay colaboradores activos."
+          />
         </CardBody>
       </Card>
     </div>
   );
 }
 
-function MiniStacked({
-  counts,
-  total,
+function PickerGrid({
+  items,
+  empty,
 }: {
-  counts: Partial<Record<CargaTrabajo, number>>;
-  total: number;
+  items: { id: string; label: string; sub?: string; href: string }[];
+  empty: string;
 }) {
-  const sinRegistro = total - CARGA_ORDEN.reduce((s, c) => s + (counts[c] ?? 0), 0);
+  if (items.length === 0)
+    return <p className="text-sm text-muted">{empty}</p>;
   return (
-    <div className="flex h-3 w-full overflow-hidden rounded-full bg-gray-100">
-      {CARGA_ORDEN.map((c) =>
-        counts[c] ? (
-          <div
-            key={c}
-            style={{
-              width: `${((counts[c] ?? 0) / total) * 100}%`,
-              backgroundColor: CARGA_COLOR[c],
-            }}
-            title={`${CARGA_LABEL[c]}: ${counts[c]}`}
-          />
-        ) : null,
-      )}
-      {sinRegistro > 0 && (
-        <div
-          style={{ width: `${(sinRegistro / total) * 100}%` }}
-          className="bg-gray-300"
-          title={`Sin registro: ${sinRegistro}`}
-        />
-      )}
-    </div>
-  );
-}
-
-function Leyenda() {
-  return (
-    <div className="flex flex-wrap gap-3 pt-2">
-      {CARGA_ORDEN.map((c) => (
-        <span key={c} className="flex items-center gap-1.5 text-xs text-muted">
-          <span
-            className="h-2.5 w-2.5 rounded-full"
-            style={{ backgroundColor: CARGA_COLOR[c] }}
-          />
-          {CARGA_LABEL[c]}
-        </span>
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((it) => (
+        <Link
+          key={it.id}
+          href={it.href}
+          className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm [transition:border-color_var(--dur-ui)_var(--ease-out)] hover:border-primary"
+        >
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-ink">
+              {it.label}
+            </span>
+            {it.sub && (
+              <span className="block truncate text-xs text-muted">{it.sub}</span>
+            )}
+          </span>
+          <span className="text-muted">→</span>
+        </Link>
       ))}
-      <span className="flex items-center gap-1.5 text-xs text-muted">
-        <span className="h-2.5 w-2.5 rounded-full bg-gray-300" />
-        Sin registro
-      </span>
     </div>
   );
 }
