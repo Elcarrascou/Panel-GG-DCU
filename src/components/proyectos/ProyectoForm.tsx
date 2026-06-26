@@ -92,6 +92,16 @@ export function ProyectoForm({
           defaultValue={proyecto?.descripcion ?? ""}
         />
       </Field>
+      <Field
+        label="Notas internas"
+        hint="Contexto interno, decisiones pendientes, estado detallado…"
+      >
+        <Textarea
+          name="notas"
+          rows={5}
+          defaultValue={proyecto?.notas ?? ""}
+        />
+      </Field>
       <div className="flex items-center gap-3 pt-2">
         <Button type="submit">
           {proyecto ? "Guardar cambios" : "Crear proyecto"}

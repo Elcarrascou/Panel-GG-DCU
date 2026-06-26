@@ -73,6 +73,17 @@ export default async function ReporteProyectoPage({
         </Card>
       )}
 
+      {proyecto.notas && (
+        <Card className="mb-6">
+          <CardHeader title="Notas del proyecto" />
+          <CardBody>
+            <p className="whitespace-pre-wrap text-sm text-ink">
+              {proyecto.notas}
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
       {/* Equipo asignado */}
       <Card className="mb-6">
         <CardHeader

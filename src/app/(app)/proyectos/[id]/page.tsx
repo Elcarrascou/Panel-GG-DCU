@@ -93,6 +93,17 @@ export default async function ProyectoDetallePage({
         </Card>
       )}
 
+      {proyecto.notas && (
+        <Card className="mb-6">
+          <CardHeader title="Notas del proyecto" />
+          <CardBody>
+            <p className="whitespace-pre-wrap text-sm text-ink">
+              {proyecto.notas}
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
       <Card className="mb-6">
         <CardHeader
           title="Hitos del proyecto"

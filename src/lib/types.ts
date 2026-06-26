@@ -75,6 +75,7 @@ export interface Proyecto {
   cliente_id: string;
   estado: ProyectoEstado;
   descripcion: string | null;
+  notas: string | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
   created_at: string;

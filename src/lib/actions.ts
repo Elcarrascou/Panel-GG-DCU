@@ -208,6 +208,7 @@ export async function guardarProyecto(
     cliente_id,
     estado,
     descripcion: str(fd, "descripcion"),
+    notas: str(fd, "notas"),
     fecha_inicio,
     fecha_fin,
   };
